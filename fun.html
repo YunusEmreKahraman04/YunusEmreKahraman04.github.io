@@ -17,7 +17,7 @@
     } }
   </script>
   <link rel="modulepreload" href="assets/vendor/three/build/three.module.min.js">
-  <link rel="stylesheet" href="assets/fun/fun.css?v=4">
+  <link rel="stylesheet" href="assets/fun/fun.css?v=5">
   <link rel="stylesheet" href="assets/switcher/switcher.css?v=2">
   <script src="assets/switcher/switcher.js?v=1" data-current="fun"></script>
 </head>
@@ -57,7 +57,10 @@
             <div class="seg" id="botSeg" role="group"><button type="button" data-v="true" data-k="on"></button><button type="button" data-v="false" data-k="off"></button></div>
           </div>
         </div>
+        <p class="invite-note" id="inviteNote" hidden><b data-k="inviteFor"></b> <span id="inviteText"></span></p>
         <button type="button" class="play" id="play"><span data-k="play"></span><i aria-hidden="true">▶</i></button>
+        <button type="button" class="lobbies-btn" id="lobbiesBtn"><b data-k="lobbies"></b><span></span></button>
+        <p class="net-warn" id="netWarn" hidden data-k="noRelay"></p>
         <p class="mobile-note" id="mobileNote" hidden data-k="desktop"></p>
       </section>
 
@@ -174,8 +177,19 @@
         <p class="hz" id="refreshHz"></p>
       </section>
 
+      <p class="room-label" id="roomLabel"></p>
+      <button type="button" class="pause-invite" id="copyInvite" data-k="invite"></button>
       <button type="button" class="pause-lobby" id="pauseLobby" data-k="toLobby"></button>
       <button type="button" class="pause-lobby" id="pauseClose" data-k="close"></button>
+    </div>
+  </div>
+
+  <!-- ================= LOBBY BROWSER ================= -->
+  <div class="lobbies" id="lobbies" hidden>
+    <div class="lbs-card">
+      <header class="lbs-head"><b data-k="lobbies"></b><span id="lbsNet"></span><button type="button" class="buy-x" id="lbsClose" aria-label="close">✕</button></header>
+      <ul class="lbs-list" id="lbsList"></ul>
+      <button type="button" class="lbs-create" id="lbsCreate" data-k="createLobby"></button>
     </div>
   </div>
 
@@ -188,6 +202,6 @@
   </div>
 
   <noscript><p class="nojs">YEK Strike needs JavaScript and WebGL.</p></noscript>
-  <script type="module" src="assets/fun/main.js?v=4"></script>
+  <script type="module" src="assets/fun/main.js?v=5"></script>
 </body>
 </html>

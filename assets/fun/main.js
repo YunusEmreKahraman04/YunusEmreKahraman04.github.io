@@ -13,7 +13,7 @@ import { Sfx } from './audio.js';
 import { Hud, drawCrosshair } from './hud.js';
 import { Effects } from './effects.js';
 import { BotBrain, BOT_NAMES } from './bots.js';
-import { joinLobby, joinMatch, selfId } from './net.js';
+import { joinLobby, joinMatch, selfId, makeRoomId, parseRoomId, relayCount } from './net.js';
 
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -49,7 +49,12 @@ const STR = {
     autoBuy: 'Ölünce aynı silahları tekrar al', statDmg: 'Hasar', statRate: 'Atış hızı', statMob: 'Hareket', buyHint: 'B ile kapat',
     rounds: 'Raunt', dm: 'DM', nextRound: 'Bir sonraki rauntta doğacaksın', tWin: 'TERÖRİSTLER KAZANDI', ctWin: 'ANTİ-TERÖRİSTLER KAZANDI',
     matchOver: 'MAÇ BİTTİ', roundN: 'RAUNT {n}', winMoney: '+${m} raunt ödülü', fullscreen: 'Tam ekran (Ctrl ile eğilme)',
-    ctrlHint: 'Ctrl ile eğilmek için tam ekran gerekir (Ayarlar). Şimdilik C kullan.', freeze: 'Hazırlan…'
+    ctrlHint: 'Ctrl ile eğilmek için tam ekran gerekir (Ayarlar). Şimdilik C kullan.', freeze: 'Hazırlan…',
+    lobbies: 'LOBİLER', lobbiesOpen: '{n} açık lobi', createLobby: '+ Yeni lobi oluştur', join: 'KATIL', full: 'DOLU', yours: 'SENİN',
+    noLobbies: 'Şu an açık lobi yok. Yeni bir lobi oluştur ya da OYNA\'ya bas, arkadaşın LOBİLER\'den seni görsün.',
+    hostBy: 'host: {n}', bots_n: '+{n} bot', invite: 'Davet linkini kopyala', copied: 'Davet linki kopyalandı, arkadaşına gönder.',
+    inviteFor: 'Davet edildin', joinInvite: 'LOBİYE KATIL', relays: '{n} sinyal', noRelay: 'Sinyal sunucularına ulaşılamıyor: ağın (okul/iş ağı, VPN) engelliyor olabilir.',
+    p2pFail: 'Bir oyuncuyla doğrudan bağlantı kurulamadı (ağ/NAT engeli). Farklı bir ağdan (ör. telefondan hotspot) deneyin.', lobbyCode: 'Lobi', modeRounds: '{n} raunt'
   },
   en: {
     kicker: 'FUN · P2P MULTIPLAYER', sub: 'A Counter-Strike replica in the browser. No server: players connect to each other directly over WebRTC. Pick a map, jump in, shoot.',
@@ -73,7 +78,12 @@ const STR = {
     autoBuy: 'Re-buy the same loadout on respawn', statDmg: 'Damage', statRate: 'Fire rate', statMob: 'Mobility', buyHint: 'B to close',
     rounds: 'Rounds', dm: 'DM', nextRound: 'You will spawn next round', tWin: 'TERRORISTS WIN', ctWin: 'COUNTER-TERRORISTS WIN',
     matchOver: 'MATCH OVER', roundN: 'ROUND {n}', winMoney: '+${m} round reward', fullscreen: 'Fullscreen (Ctrl to crouch)',
-    ctrlHint: 'Crouching with Ctrl needs fullscreen (Settings). Use C for now.', freeze: 'Get ready…'
+    ctrlHint: 'Crouching with Ctrl needs fullscreen (Settings). Use C for now.', freeze: 'Get ready…',
+    lobbies: 'LOBBIES', lobbiesOpen: '{n} open lobbies', createLobby: '+ Create a new lobby', join: 'JOIN', full: 'FULL', yours: 'YOURS',
+    noLobbies: 'No open lobbies right now. Create one or hit PLAY, and your friend will see you under LOBBIES.',
+    hostBy: 'host: {n}', bots_n: '+{n} bots', invite: 'Copy invite link', copied: 'Invite link copied, send it to your friend.',
+    inviteFor: 'You were invited', joinInvite: 'JOIN LOBBY', relays: '{n} relays', noRelay: 'Cannot reach the signalling relays: your network (school/work, VPN) may block them.',
+    p2pFail: 'Could not connect directly to a player (network/NAT). Try another network (e.g. a phone hotspot).', lobbyCode: 'Lobby', modeRounds: '{n} rounds'
   }
 };
 let lang = store.get('lang');
@@ -85,6 +95,7 @@ function applyLang() {
   $$('[data-k-ph]').forEach(el => { el.placeholder = t(el.dataset.kPh); });
   $$('[data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
   renderServers();
+  if (G.invite) $('#play').querySelector('span').textContent = t('joinInvite');
 }
 
 // ---------------------------------------------------------------- settings
@@ -149,7 +160,7 @@ const G = {
   infoDirty: true, lastInfo: 0, lastState: 0, lastHost: 0, lastSpot: 0, lastRadar: 0,
   locked: false, mouseDown: false, triggerUsed: false, typing: false, board: false, buyOpen: false,
   aimEnt: null, mdx: 0, mdy: 0, killer: null, killerW: '', deathCam: 0, landed: false, streak: 0, streakAt: 0,
-  eyeOff: 0, money: 4000, pref: {}, kbLock: false, ctrlHinted: false,
+  eyeOff: 0, money: 4000, pref: {}, kbLock: false, ctrlHinted: false, room: '', announceTick: 0, invite: '', p2pWarned: false,
   // rounds: decided by the room host and mirrored by everyone
   R: { on: false, max: 0, n: 0, phase: '', endsAt: 0, startedAt: 0, wins: { T: 0, CT: 0 }, streak: { T: 0, CT: 0 }, sentAt: 0 }
 };
@@ -585,7 +596,10 @@ const handlers = {
     if (!x || typeof d.t !== 'string') return;
     hud.chat(x.name, x.team, d.t.slice(0, 120));
   },
-  error(d) { console.warn('[net] join error', d); }
+  error(d) {
+    console.warn('[net] join error', d);
+    if (!G.p2pWarned) { G.p2pWarned = true; hud.chat('', '', t('p2pFail'), true); }
+  }
 };
 function sendInfo(target) {
   if (!G.net) return;
@@ -969,6 +983,7 @@ function gameFrame(dt) {
     if (G.infoDirty || tn - G.lastInfo > 3000) { G.infoDirty = false; G.lastInfo = tn; sendInfo(); }
     if (tn - G.lastHost > 1000) {
       G.lastHost = tn; hostCheck();
+      if (++G.announceTick % 3 === 0) announce();
       const n = G.net.peers().length;
       hud.peers(n + 1, n ? 'on' : 'alone');
     }
@@ -982,7 +997,10 @@ function gameFrame(dt) {
 }
 
 // ---------------------------------------------------------------- start / stop a match
-function startGame(mapId) {
+function startGame(roomId) {
+  const info = parseRoomId(roomId) || { map: settings.map, rounds: settings.rounds };
+  const mapId = MAPS[info.map] ? info.map : 'awp_lego';
+  G.room = roomId;
   setWorld(mapId);
   hud.radarMap(mapDef, world.boxes);
   fx.clear();
@@ -990,15 +1008,16 @@ function startGame(mapId) {
   G.ents.clear();
   G.peerInfo.clear();
   G.since = Date.now(); G.joinedAt = now(); G.botSeq = 0; G.infoDirty = true; G.killer = null;
-  G.R = { on: settings.rounds > 0, max: settings.rounds, n: 0, phase: '', endsAt: 0, startedAt: 0, wins: { T: 0, CT: 0 }, streak: { T: 0, CT: 0 }, sentAt: 0 };
+  G.R = { on: info.rounds > 0, max: info.rounds, n: 0, phase: '', endsAt: 0, startedAt: 0, wins: { T: 0, CT: 0 }, streak: { T: 0, CT: 0 }, sentAt: 0 };
   G.money = G.R.on ? 800 : START_MONEY;
   let team = settings.team;
   if (team !== 'T' && team !== 'CT') team = Math.random() < 0.5 ? 'T' : 'CT';
   G.me = makeEnt(selfId, selfId, clean(settings.name), team, false);
   setVM(new ViewModel(team));
   spawn(G.me);
-  try { G.net = joinMatch(mapId + (G.R.on ? '-r' + G.R.max : ''), handlers); } catch (e) { console.warn('[net] match unavailable', e); G.net = null; }
-  if (lobby) lobby.set(mapId, G.me.name);
+  try { G.net = joinMatch(roomId, handlers); } catch (e) { console.warn('[net] match unavailable', e); G.net = null; }
+  announce();
+  $('#roomLabel').textContent = t('lobbyCode') + ': ' + MAPS[mapId].title + ' · ' + (G.R.on ? t('modeRounds').replace('{n}', G.R.max) : 'DM') + ' · ' + (parseRoomId(roomId) || { code: '' }).code;
   G.mode = 'game';
   root.classList.add('ingame');
   $('#lobby').hidden = true;
@@ -1023,7 +1042,8 @@ function leaveGame() {
   hud.board(false);
   showPause(false);
   $('#lobby').hidden = false;
-  if (lobby) lobby.set('', clean(settings.name));
+  G.room = '';
+  if (lobby) lobby.set({ r: '', h: false, n: clean(settings.name) });
   setWorld(settings.map);
 }
 
@@ -1048,7 +1068,7 @@ async function lock() {
   }
   try {
     const r = canvas.requestPointerLock({ unadjustedMovement: true });
-    if (r && r.catch) await r.catch(() => canvas.requestPointerLock());
+    if (r && r.catch) await r.catch(() => { const r2 = canvas.requestPointerLock(); if (r2 && r2.catch) return r2.catch(() => hud.center(t('lockFail'))); });
   } catch (e) {
     try { canvas.requestPointerLock(); } catch (e2) { hud.center(t('lockFail')); }
   }
@@ -1227,7 +1247,7 @@ function renderServers() {
       </span>
     </button></li>`;
   }).join('');
-  $('#online').textContent = lobby ? `${counts._online || 1} ${t('online')}` : t('connecting');
+  if (!lobby) $('#online').textContent = t('connecting');
 }
 $('#servers').addEventListener('click', e => {
   const b = e.target.closest('.srv');
@@ -1340,13 +1360,63 @@ gsync.push(bindToggle('#gAA', settings.gfx, 'aa', onGfx));
 gsync.push(bindToggle('#gFps', settings.gfx, 'fpsShow', onGfx));
 $('#fps').hidden = !settings.gfx.fpsShow;
 
-function play() {
+function announce() {
+  if (!lobby) return;
+  if (G.mode !== 'game' || !G.room) { lobby.set({ r: '', h: false, n: clean(settings.name) }); return; }
+  let humans = 0, bots = 0;
+  for (const x of G.ents.values()) { if (x.bot) bots++; else humans++; }
+  const score = G.R.on ? G.R.wins.CT + ':' + G.R.wins.T + ' · R' + G.R.n : '';
+  lobby.set({ r: G.room, n: G.me ? G.me.name : clean(settings.name), h: !!G.host, p: humans, b: bots, s: score });
+}
+function enter(roomId) {
   if (coarse) return;
   settings.name = clean(nick.value); nick.value = settings.name; saveSettings();
   sfx.unlock();
-  startGame(settings.map);
+  closeLobbies();
+  G.invite = '';
+  $('#inviteNote').hidden = true;
+  startGame(roomId);
   lock();
 }
+// quick play: the busiest open lobby with the same map and mode, or a new one
+function play() {
+  if (G.invite) return enter(G.invite);
+  const open = lobby ? lobby.lobbies().filter(L => L.map === settings.map && L.rounds === settings.rounds && L.humans < 10) : [];
+  enter(open.length ? open[0].room : makeRoomId(settings.map, settings.rounds));
+}
+const MAX_HUMANS = 10;
+function renderLobbies() {
+  const list = lobby ? lobby.lobbies() : [];
+  $('#lobbiesBtn').querySelector('span').textContent = t('lobbiesOpen').replace('{n}', list.length);
+  const relays = relayCount();
+  $('#online').textContent = lobby ? (lobby.online() + ' ' + t('online') + ' · ' + t('relays').replace('{n}', relays)) : t('connecting');
+  $('#netWarn').hidden = !(lobby && relays === 0 && performance.now() > 8000);
+  if ($('#lobbies').hidden) return;
+  $('#lbsNet').textContent = $('#online').textContent;
+  $('#lbsList').innerHTML = list.length ? list.map(L => {
+    const m = MAPS[L.map];
+    const full = L.humans >= MAX_HUMANS;
+    return '<li class="lbs-row' + (L.mine ? ' mine' : '') + '">' +
+      '<span class="srv-art art-' + esc(L.map) + '" aria-hidden="true"></span>' +
+      '<span class="lbs-main"><b>' + esc(m ? m.title : L.map) + '</b><small>' + esc(L.rounds ? t('modeRounds').replace('{n}', L.rounds) : 'Deathmatch') + (L.score ? ' · ' + esc(L.score) : '') + ' · ' + esc(t('hostBy').replace('{n}', L.host)) + '</small></span>' +
+      '<span class="lbs-count"><b>' + L.humans + '/' + MAX_HUMANS + '</b><small>' + (L.bots ? esc(t('bots_n').replace('{n}', L.bots)) : '') + '</small></span>' +
+      (L.mine ? '<em class="lbs-tag">' + esc(t('yours')) + '</em>' : '<button type="button" class="lbs-join" data-room="' + esc(L.room) + '"' + (full ? ' disabled' : '') + '>' + esc(full ? t('full') : t('join')) + '</button>') +
+      '</li>';
+  }).join('') : '<li class="lbs-empty">' + esc(t('noLobbies')) + '</li>';
+}
+function openLobbies() { $('#lobbies').hidden = false; sfx.unlock(); sfx.ui(); renderLobbies(); }
+function closeLobbies() { $('#lobbies').hidden = true; }
+$('#lobbiesBtn').addEventListener('click', openLobbies);
+$('#lbsClose').addEventListener('click', closeLobbies);
+$('#lobbies').addEventListener('click', e => { if (e.target === $('#lobbies')) closeLobbies(); });
+$('#lbsList').addEventListener('click', e => { const b = e.target.closest('[data-room]'); if (b && !b.disabled) enter(b.dataset.room); });
+$('#lbsCreate').addEventListener('click', () => enter(makeRoomId(settings.map, settings.rounds)));
+$('#copyInvite').addEventListener('click', async () => {
+  const url = location.origin + location.pathname + '?lobby=' + encodeURIComponent(G.room);
+  try { await navigator.clipboard.writeText(url); } catch (e) { prompt('', url); }
+  hud.center(t('copied'), 2500);
+});
+setInterval(renderLobbies, 2000);
 $('#play').addEventListener('click', play);
 nick.addEventListener('keydown', e => { if (e.key === 'Enter') play(); });
 if (coarse) { $('#play').disabled = true; $('#mobileNote').hidden = false; }
@@ -1359,9 +1429,25 @@ setWorld(MAPS[settings.map] ? settings.map : (settings.map = 'awp_lego'));
 resize();
 applyLang();
 try {
-  lobby = joinLobby(c => { counts = c; renderServers(); });
-  if (lobby) lobby.set('', clean(settings.name));
+  lobby = joinLobby(() => {
+    counts = {};
+    for (const L of lobby.lobbies()) counts[L.map] = (counts[L.map] || 0) + L.humans;
+    renderServers(); renderLobbies();
+  });
+  if (lobby) lobby.set({ r: '', n: clean(settings.name) });
 } catch (e) { console.warn('[net] lobby failed', e); }
+{
+  // fun.html?lobby=<room>: an invite from a friend
+  const inv = new URLSearchParams(location.search).get('lobby');
+  const info = parseRoomId(inv);
+  if (info && MAPS[info.map]) {
+    G.invite = inv;
+    settings.map = info.map; setWorld(info.map);
+    $('#inviteNote').hidden = false;
+    $('#inviteText').textContent = MAPS[info.map].title + ' · ' + (info.rounds ? t('modeRounds').replace('{n}', info.rounds) : 'Deathmatch') + ' · ' + info.code;
+    $('#play').querySelector('span').textContent = t('joinInvite');
+  }
+}
 renderServers();
 // build the other map while the visitor reads the lobby
 setTimeout(() => { for (const id of MAP_ORDER) worlds[id] ||= buildWorld(MAPS[id], renderer); }, 600);
