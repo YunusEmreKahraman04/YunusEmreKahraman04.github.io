@@ -47,6 +47,8 @@
     sync: '<path d="M20 8A8.5 8.5 0 0 0 5 6.5L3.5 8"/><path d="M3.5 3.5V8H8"/><path d="M4 16a8.5 8.5 0 0 0 15 1.5l1.5-1.5"/><path d="M20.5 20.5V16H16"/>',
     database: '<ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v13c0 1.7 3.6 3 8 3s8-1.3 8-3v-13M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
     cloud: '<path d="M7 18.5a4.5 4.5 0 1 1 .8-8.9A6 6 0 0 1 19.4 11 3.8 3.8 0 0 1 18 18.5H7Z"/>',
+    route: '<circle cx="5.5" cy="18.5" r="2.2"/><circle cx="18.5" cy="5.5" r="2.2"/><path d="M7.8 18.5H15a3.3 3.3 0 0 0 0-6.6H9a3.3 3.3 0 0 1 0-6.6h7.2"/>',
+    search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.6-4.6M7.5 12.5v-2M10.5 12.5v-4M13.5 12.5V11"/>',
     team: '<circle cx="12" cy="7" r="3.5"/><path d="M5 21a7 7 0 0 1 14 0"/>',
     palette: '<path d="M12 21a9 9 0 1 1 9-9c0 2.5-2 3.5-4 3.5h-2a2 2 0 0 0-1.5 3.3A1.4 1.4 0 0 1 12 21Z"/><circle cx="7.5" cy="11" r="1.1"/><circle cx="10.5" cy="7" r="1.1"/><circle cx="15" cy="7.5" r="1.1"/>'
   };
@@ -130,7 +132,13 @@
   }
 
   function renderAbout() {
-    $('#aboutBody').innerHTML = L().about.body.map(p => `<p>${esc(p)}</p>`).join('');
+    // Two-word chunks: half the scroll-driven animations, same reading rhythm.
+    const fillWords = text => {
+      const w = text.split(' '), chunks = [];
+      for (let i = 0; i < w.length; i += 2) chunks.push(w.slice(i, i + 2).join(' '));
+      return chunks.map((x, i) => `<span class="fw" style="--p:${(i / Math.max(1, chunks.length - 1)).toFixed(3)}">${esc(x)}</span>`).join(' ');
+    };
+    $('#aboutBody').innerHTML = L().about.body.map((p, i) => (i === 0 ? `<p class="fill-text">${fillWords(p)}</p>` : `<p>${esc(p)}</p>`)).join('');
 
     const techCount = C.skills.reduce((n, g) => n + g.items.length, 0);
     const s = L().about.stats;
@@ -141,23 +149,42 @@
       { v: 3.08, dec: 2, label: s.cgpa, suffix: '<small>/4</small>' }
     ];
     $('#stats').innerHTML = stats.map((x, i) => `
-      <div class="stat card spotlight reveal" style="--d:${i * 0.08}s">
+      <div class="stat card spotlight reveal" style="--d:${i * 0.08}s" data-tilt>
         <span class="stat-num"><span data-count="${x.v}" data-dec="${x.dec || 0}">0</span>${x.suffix}</span>
         <span class="stat-label">${esc(x.label)}</span>
       </div>`).join('');
   }
 
+  // Animated emblem: rotating gradient ring + glyph; a real logo image wins if provided.
+  function emblem(name, i, logo, alt) {
+    const pal = [['var(--accent)', 'var(--accent-2)'], ['var(--accent-3)', 'var(--accent-4)'], ['var(--accent-2)', 'var(--accent)']][i % 3];
+    return `<span class="emblem" style="--c1:${pal[0]};--c2:${pal[1]}" aria-hidden="${logo ? 'false' : 'true'}">
+      <span class="emblem-face">${logo ? `<img src="${esc(logo)}" alt="${esc(alt || '')}" loading="lazy">` : icon(name || 'hash')}</span>
+    </span>`;
+  }
+
+  function duration(start, end) {
+    const [sy, sm] = start.split('-').map(Number);
+    const now = new Date();
+    const [ey, em] = end ? end.split('-').map(Number) : [now.getFullYear(), now.getMonth() + 1];
+    const months = Math.max(1, (ey - sy) * 12 + (em - sm) + 1);
+    const y = Math.floor(months / 12), m = months % 12;
+    const u = L().ui;
+    return [y ? `${y} ${u.yr}` : '', m ? `${m} ${u.mo}` : ''].filter(Boolean).join(' ');
+  }
+
   function renderExperience() {
-    $('#expList').innerHTML = L().experience.items.map((x, i) => `
+    $('#expList').innerHTML = '<span class="tl-head" aria-hidden="true"></span>' + L().experience.items.map((x, i) => `
       <article class="exp-item reveal" style="--d:${i * 0.08}s">
         <div class="exp-when">
           <span>${esc(x.period)}</span>
           ${x.current ? `<span class="now-badge"><i></i>${esc(t('ui.present'))}</span>` : ''}
+          ${x.start ? `<span class="dur-badge">${esc(duration(x.start, x.end))}</span>` : ''}
         </div>
         <span class="exp-dot" aria-hidden="true"></span>
-        <div class="exp-card card spotlight">
+        <div class="exp-card card spotlight" data-tilt>
           <div class="exp-top">
-            <div class="exp-logo" aria-hidden="true">${esc(x.company.charAt(0))}</div>
+            ${emblem(x.icon, i, x.logo, x.company)}
             <div>
               <h3>${esc(x.role)}</h3>
               <p class="exp-company">${esc(x.company)} · ${esc(x.location)}</p>
@@ -172,8 +199,15 @@
 
   // Street-routed map drawn by the same planner as the hero (seeded, so it is stable).
   const routePlans = {};
+  const getPlan = (h = 480) => routePlans[h] || (routePlans[h] = window.VRP.planSVG(640, h, { seed: 11, stops: 18, vehicles: 4 }));
   function routeVisual(p, h = 330) {
-    const plan = routePlans[h] || (routePlans[h] = window.VRP.planSVG(640, h, { seed: 11, stops: 18, vehicles: 4 }));
+    return `
+      ${routeSvg(h)}
+      <span class="visual-chip tr">OSRM · OR-Tools</span>
+      <div class="role-pills">${p.roles.map((r, i) => `<span><i style="background:${ACCENTS[i]}"></i>${esc(r)}</span>`).join('')}</div>`;
+  }
+  function routeSvg(h = 480, idp = 'rp') {
+    const plan = getPlan(h);
     const f = v => v.toFixed(1);
     const streets = main => plan.streets.filter(e => !!e.main === main).map(e => `M${f(e.a.x)} ${f(e.a.y)}L${f(e.b.x)} ${f(e.b.y)}`).join('');
     const dp = plan.depot;
@@ -182,20 +216,17 @@
         <path class="street" d="${streets(false)}"/>
         <path class="street main" d="${streets(true)}"/>
         ${plan.routes.map((r, i) => `
-          <path id="rp-${i}" class="ghost" d="${r.d}" style="stroke:${ACCENTS[r.color]}"/>
+          <path id="${idp}-${i}" class="ghost" d="${r.d}" style="stroke:${ACCENTS[r.color]}"/>
           <path class="draw" pathLength="1" d="${r.d}" style="stroke:${ACCENTS[r.color]};--delay:${0.2 + i * 0.25}s"/>
         `).join('')}
         ${plan.routes.map((r, i) => `
           ${r.stops.map(q => `<circle class="stop" cx="${f(q.x)}" cy="${f(q.y)}" r="4.5" style="stroke:${ACCENTS[r.color]}"/>`).join('')}
-          ${reduce ? '' : [[10, 0.22], [4.5, 1]].map(([rad, op]) => `<circle class="veh" r="${rad}" style="fill:${ACCENTS[r.color]};opacity:${op}"><animateMotion dur="${(r.len / 70).toFixed(1)}s" repeatCount="indefinite"><mpath href="#rp-${i}" xlink:href="#rp-${i}"/></animateMotion></circle>`).join('')}
+          ${reduce ? '' : [[10, 0.22], [4.5, 1]].map(([rad, op]) => `<circle class="veh" r="${rad}" style="fill:${ACCENTS[r.color]};opacity:${op}"><animateMotion dur="${(r.len / 70).toFixed(1)}s" repeatCount="indefinite"><mpath href="#${idp}-${i}" xlink:href="#${idp}-${i}"/></animateMotion></circle>`).join('')}
         `).join('')}
         <circle class="depot-ring" cx="${f(dp.x)}" cy="${f(dp.y)}" r="12"/>
         <rect class="depot" x="${f(dp.x - 7)}" y="${f(dp.y - 7)}" width="14" height="14" rx="3"/>
       </svg>`;
-    return `
-      ${svg}
-      <span class="visual-chip tr">OSRM · OR-Tools</span>
-      <div class="role-pills">${p.roles.map((r, i) => `<span><i style="background:${ACCENTS[i]}"></i>${esc(r)}</span>`).join('')}</div>`;
+    return svg;
   }
 
   function visionVisual() {
@@ -271,10 +302,67 @@
     $('#projectGrid').innerHTML = cards + more;
   }
 
+  /* ---------- Story: scroll-driven 3D (Three.js loads when the section nears) ---------- */
+  const storyEl = $('#story');
+  const storyStage = $('#storyStage');
+  const STORY_AT = [0, 0.26, 0.46, 0.72, 1];
+  let cityMod = null, cityWaiting = null, storyIdx = -1, storyP = 0;
+
+  function renderStory() {
+    storyStage.innerHTML = routeSvg(480, 'sp');
+    $('#storySteps').innerHTML = L().story.steps.map((s, i) => `
+      <li class="story-step" data-i="${i}">
+        <span class="ss-num">${String(i + 1).padStart(2, '0')}</span>
+        <div><b class="ss-k">${esc(s.k)}</b><h3>${esc(s.t)}</h3><p>${esc(s.d)}</p></div>
+        <i class="ss-bar"><b></b></i>
+      </li>`).join('');
+    storyIdx = -1;
+    updateStory(storyP);
+    mountCity();
+  }
+
+  function updateStory(p) {
+    storyP = p;
+    let idx = 0;
+    while (idx < 3 && p >= STORY_AT[idx + 1]) idx++;
+    if (idx !== storyIdx) {
+      storyIdx = idx;
+      storyStage.dataset.stage = idx;
+      $$('.story-step', storyEl).forEach((li, i) => li.classList.toggle('on', i === idx));
+    }
+    const local = clamp((p - STORY_AT[idx]) / (STORY_AT[idx + 1] - STORY_AT[idx]), 0, 1);
+    const bar = $(`.story-step[data-i="${idx}"] .ss-bar b`, storyEl);
+    if (bar) bar.style.transform = `scaleX(${local.toFixed(3)})`;
+    storyEl.classList.toggle('started', p > 0.03);
+    cityMod && cityMod.setProgress(p);
+  }
+
+  function mountCity() {
+    if (reduce) return;
+    if (cityMod) { cityMod.mount(storyStage, getPlan(480)); return; }
+    if (cityWaiting) return;
+    cityWaiting = new IntersectionObserver(([en]) => {
+      if (!en.isIntersecting) return;
+      cityWaiting.disconnect();
+      import('./city3d.js?v=21')
+        .then(mod => {
+          if (mod.mount(storyStage, getPlan(480)) !== false) { cityMod = mod; mod.setProgress(storyP); }
+        })
+        .catch(err => console.warn('3D story unavailable, keeping the SVG fallback.', err));
+    }, { rootMargin: '900px 0px' });
+    cityWaiting.observe(storyEl);
+  }
+
+  function refreshVisuals() {
+    window.VRP && window.VRP.refresh();
+    cityMod && cityMod.refresh();
+    window.Aurora && window.Aurora.refresh();
+  }
+
   function renderSkills() {
     const G = L().skills.groups;
     $('#skillGrid').innerHTML = C.skills.map((g, i) => `
-      <div class="skill-card card spotlight reveal" style="--d:${(i % 2) * 0.08}s;--c:${ACCENTS[i]}">
+      <div class="skill-card card spotlight reveal" style="--d:${(i % 2) * 0.08}s;--c:${ACCENTS[i]}" data-tilt>
         <div class="skill-head">
           <span class="skill-icon">${icon(g.icon)}</span>
           <h3>${esc(G[g.id])}</h3>
@@ -290,6 +378,74 @@
     $('#marquee').innerHTML = `
       <div class="mq-track">${row(a)}${row(a)}</div>
       <div class="mq-track rev">${row(b)}${row(b)}</div>`;
+    renderOrb();
+  }
+
+  /* ---------- 3D tech sphere (CSS transforms only, runs while visible) ---------- */
+  const orb = { el: $('#skillOrb'), items: [], pts: [], ax: -0.35, ay: 0, vx: 0, vy: 0.22, drag: null, raf: 0, visible: false, last: 0 };
+  function renderOrb() {
+    if (!orb.el) return;
+    const list = C.skills.flatMap((g, gi) => g.items.map(s => ({ label: pick(s), c: ACCENTS[gi] })));
+    orb.el.innerHTML = list.map(it => `<span style="--c:${it.c}">${esc(it.label)}</span>`).join('');
+    orb.items = $$('span', orb.el);
+    const n = orb.items.length;
+    orb.pts = orb.items.map((_, i) => {
+      const y = 1 - (i / (n - 1)) * 2, r = Math.sqrt(1 - y * y), th = i * 2.399963;
+      return { x: Math.cos(th) * r, y, z: Math.sin(th) * r };
+    });
+    drawOrb();
+  }
+  function drawOrb() {
+    const R = orb.el.clientWidth * 0.42;
+    const cx = Math.cos(orb.ax), sx = Math.sin(orb.ax), cy = Math.cos(orb.ay), sy = Math.sin(orb.ay);
+    orb.pts.forEach((p, i) => {
+      const x1 = p.x * cy + p.z * sy, z1 = -p.x * sy + p.z * cy;
+      const y2 = p.y * cx - z1 * sx, z2 = p.y * sx + z1 * cx;
+      const k = (z2 + 1) / 2;
+      const el = orb.items[i], st = el.style;
+      st.transform = `translate3d(${(x1 * R).toFixed(1)}px, ${(y2 * R).toFixed(1)}px, 0) translate(-50%, -50%) scale(${(0.55 + k * 0.6).toFixed(3)})`;
+      // only touch opacity / stacking when they visibly change
+      const op = Math.round((0.15 + k * 0.85) * 40) / 40, zi = Math.round(k * 12);
+      if (el._op !== op) { el._op = op; st.opacity = op; }
+      if (el._zi !== zi) { el._zi = zi; st.zIndex = zi; }
+    });
+  }
+  function orbFrame(now) {
+    orb.raf = 0;
+    if (!orb.visible) return;
+    const dt = orb.last ? Math.min(0.05, (now - orb.last) / 1000) : 0;
+    if (orb.last && now - orb.last < 1000 / 61) { orb.raf = requestAnimationFrame(orbFrame); return; }
+    orb.last = now;
+    if (!orb.drag) {
+      orb.vy += (0.22 - orb.vy) * 0.02;
+      orb.vx += (0 - orb.vx) * 0.02;
+    }
+    orb.ay += orb.vy * dt;
+    orb.ax = clamp(orb.ax + orb.vx * dt, -1.2, 1.2);
+    drawOrb();
+    orb.raf = requestAnimationFrame(orbFrame);
+  }
+  if (orb.el && !reduce) {
+    new IntersectionObserver(([en]) => {
+      orb.visible = en.isIntersecting;
+      orb.last = 0;
+      if (orb.visible && !orb.raf) orb.raf = requestAnimationFrame(orbFrame);
+    }).observe(orb.el);
+    orb.el.addEventListener('pointerdown', e => {
+      orb.drag = { x: e.clientX, y: e.clientY, t: performance.now() };
+      orb.el.setPointerCapture(e.pointerId);
+      orb.el.classList.add('dragging');
+    });
+    orb.el.addEventListener('pointermove', e => {
+      if (!orb.drag) return;
+      const now = performance.now(), dt = Math.max(16, now - orb.drag.t) / 1000;
+      orb.vy = ((e.clientX - orb.drag.x) / orb.el.clientWidth) * 3.2 / dt * 0.25;
+      orb.vx = (-(e.clientY - orb.drag.y) / orb.el.clientHeight) * 3.2 / dt * 0.25;
+      orb.drag = { x: e.clientX, y: e.clientY, t: now };
+    });
+    const release = () => { orb.drag = null; orb.el.classList.remove('dragging'); };
+    orb.el.addEventListener('pointerup', release);
+    orb.el.addEventListener('pointercancel', release);
   }
 
   function renderEducation() {
@@ -297,7 +453,7 @@
     const cgpa = 3.08, max = 4;
     const off = (100 - (cgpa / max) * 100).toFixed(2);
     $('#eduGrid').innerHTML = `
-      <div class="edu-card card spotlight reveal">
+      <div class="edu-card card spotlight reveal" data-tilt>
         <div class="edu-head">
           <span class="edu-icon">${icon('cap')}</span>
           <div>
@@ -326,8 +482,8 @@
         <h3 class="reveal">${esc(E.certsTitle)}</h3>
         <ol class="cert-list">
           ${E.certs.map((c, i) => `
-            <li class="cert card spotlight reveal" style="--d:${i * 0.08}s">
-              <span class="cert-idx">${String(i + 1).padStart(2, '0')}</span>
+            <li class="cert card spotlight reveal" style="--d:${i * 0.08}s" data-tilt>
+              ${emblem(c.icon, i + 1)}
               <div><h4>${esc(c.title)}</h4><p>${esc(c.issuer)}</p></div>
               ${c.year ? `<span class="cert-year">${esc(c.year)}</span>` : ''}
             </li>`).join('')}
@@ -363,18 +519,18 @@
     if (el.id === 'terminal') { termStarted = true; typeTerminal(instant); }
   }
 
+  // Odometer: every digit is a 0–9 strip that rolls into place (transform only).
+  const STRIP = '01234567890123456789'.split('').map(n => `<span>${n}</span>`).join('');
   function countUp(el, instant) {
-    const to = parseFloat(el.dataset.count);
-    const dec = parseInt(el.dataset.dec || '0', 10);
-    const fmt = v => v.toFixed(dec);
-    if (instant || reduce) { el.textContent = fmt(to); return; }
-    const t0 = performance.now(), dur = 1600;
-    const tick = now => {
-      const p = clamp((now - t0) / dur, 0, 1);
-      el.textContent = fmt(to * (1 - Math.pow(1 - p, 4)));
-      if (p < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
+    const str = parseFloat(el.dataset.count).toFixed(parseInt(el.dataset.dec || '0', 10));
+    if (reduce) { el.textContent = str; return; }
+    el.setAttribute('aria-label', str);
+    el.innerHTML = [...str].map((ch, k) => (/\d/.test(ch)
+      ? `<span class="od" aria-hidden="true"><span class="od-strip" style="--d:${+ch + 10};--k:${k}">${STRIP}</span></span>`
+      : `<span class="od-sep" aria-hidden="true">${esc(ch)}</span>`)).join('');
+    el.classList.toggle('od-instant', !!instant);
+    if (instant) { el.classList.add('rolled'); return; }
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('rolled')));
   }
 
   let termToken = 0, termStarted = false;
@@ -481,7 +637,8 @@
         const px = (e.clientX - r.left) / r.width - 0.5;
         const py = (e.clientY - r.top) / r.height - 0.5;
         el.style.transition = 'transform .15s ease-out, border-color .3s';
-        el.style.transform = `perspective(1100px) rotateX(${(-py * 5).toFixed(2)}deg) rotateY(${(px * 6).toFixed(2)}deg) translateY(-4px)`;
+        const k = Math.min(1, 520 / r.width);
+        el.style.transform = `perspective(1100px) rotateX(${(-py * 6 * k).toFixed(2)}deg) rotateY(${(px * 8 * k).toFixed(2)}deg) translateY(-4px)`;
       });
       el.addEventListener('pointerleave', () => {
         el.style.transition = '';
@@ -559,7 +716,7 @@
   const sectionIO = new IntersectionObserver(entries => {
     entries.forEach(en => {
       if (!en.isIntersecting) return;
-      const a = $(`a[href="#${en.target.id}"]`, navLinks);
+      const a = $(`a[href="#${en.target.id === 'story' ? 'projects' : en.target.id}"]`, navLinks);
       $$('a', navLinks).forEach(x => x.classList.toggle('active', x === a));
       activeLink = a;
       moveInd(a);
@@ -582,17 +739,22 @@
       const r = tl.getBoundingClientRect();
       const inView = r.bottom > 0 && r.top < innerHeight;
       const dots = inView ? $$('.exp-dot', tl).map(d => { const b = d.getBoundingClientRect(); return b.top + b.height / 2; }) : null;
+      const sr = storyEl.getBoundingClientRect();
       // writes
       bar.style.transform = `scaleX(${max > 0 ? y / max : 0})`;
       const scrolled = y > 24;
       if (scrolled !== wasScrolled) { wasScrolled = scrolled; nav.classList.toggle('scrolled', scrolled); }
       boostMarquee(y - lastY);
       lastY = y;
+      updatePageRoute(max > 0 ? clamp(y / max, 0, 1) : 0);
+      if (sr.bottom > 0 && sr.top < innerHeight) updateStory(clamp(-sr.top / Math.max(1, sr.height - innerHeight), 0, 1));
       if (inView) {
         const p = clamp((innerHeight * 0.62 - r.top) / r.height, 0, 1);
         if (Math.abs(p - lastFill) > 0.0005) {
           lastFill = p;
           tl.style.setProperty('--fill', p.toFixed(4));
+          const head = tl.firstElementChild;
+          if (head) head.style.transform = `translate3d(-50%, ${(p * (r.height - 20)).toFixed(1)}px, 0)`;
           $$('.exp-item', tl).forEach((item, i) => item.classList.toggle('lit', dots[i] <= r.top + p * r.height + 1));
         }
       }
@@ -636,6 +798,82 @@
   });
 
   /* ======================================================================
+     Page route: the page as a delivery route, sections as stops
+     ====================================================================== */
+  const pageRoute = $('#pageRoute');
+  const ROUTE_STOPS = ['hero', 'about', 'experience', 'projects', 'skills', 'education', 'contact'];
+  const scrollTimeline = window.CSS && CSS.supports && CSS.supports('animation-timeline: scroll()');
+  let routeStops = [];
+
+  function buildPageRoute() {
+    const max = Math.max(1, document.documentElement.scrollHeight - innerHeight);
+    $$('.pr-stop', pageRoute).forEach(n => n.remove());
+    routeStops = ROUTE_STOPS.map(id => {
+      const sec = $(`#${id}`);
+      const at = clamp((id === 'hero' ? 0 : sec.offsetTop - 40) / max, 0, 1);
+      const a = document.createElement('a');
+      a.className = 'pr-stop';
+      a.href = id === 'hero' ? '#top' : `#${id}`;
+      a.style.setProperty('--y', `${(at * 100).toFixed(2)}%`);
+      a.innerHTML = `<span>${esc(id === 'hero' ? t('ui.depot') : L().nav[id])}</span>`;
+      pageRoute.appendChild(a);
+      return { a, at, on: false };
+    });
+    updatePageRoute();
+  }
+
+  function updatePageRoute(p) {
+    if (p === undefined) p = clamp(scrollY / Math.max(1, document.documentElement.scrollHeight - innerHeight), 0, 1);
+    routeStops.forEach(s => {
+      const on = s.at <= p + 0.004;
+      if (on !== s.on) { s.on = on; s.a.classList.toggle('on', on); }
+    });
+    if (!scrollTimeline) {
+      $('.pr-fill', pageRoute).style.transform = `scaleY(${p})`;
+      $('.pr-veh', pageRoute).style.transform = `translateY(${p * pageRoute.clientHeight}px)`;
+    }
+  }
+
+  let routeRT = 0;
+  const rebuildRoute = () => { clearTimeout(routeRT); routeRT = setTimeout(buildPageRoute, 120); };
+  new ResizeObserver(rebuildRoute).observe($('main'));
+
+  /* ---------- click sparks ---------- */
+  function sparks(x, y) {
+    const layer = document.createDocumentFragment();
+    const nodes = [];
+    const ring = document.createElement('i');
+    ring.className = 'spark-ring';
+    ring.style.left = `${x}px`; ring.style.top = `${y}px`;
+    nodes.push(ring);
+    for (let i = 0; i < 9; i++) {
+      const s = document.createElement('i');
+      s.className = 'spark';
+      s.style.left = `${x}px`; s.style.top = `${y}px`;
+      s.style.background = ACCENTS[i % 4];
+      nodes.push(s);
+    }
+    nodes.forEach(n => layer.appendChild(n));
+    document.body.appendChild(layer);
+    ring.animate([{ transform: 'scale(.3)', opacity: 0.9 }, { transform: 'scale(4.5)', opacity: 0 }],
+      { duration: 650, easing: 'cubic-bezier(.2,.75,.15,1)' }).onfinish = () => ring.remove();
+    nodes.slice(1).forEach((s, i) => {
+      const a = (i / 9) * Math.PI * 2 + Math.random() * 0.6;
+      const d = 24 + Math.random() * 34;
+      s.animate([
+        { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+        { transform: `translate(${(Math.cos(a) * d).toFixed(1)}px, ${(Math.sin(a) * d).toFixed(1)}px) scale(0)`, opacity: 0 }
+      ], { duration: 560 + Math.random() * 240, easing: 'cubic-bezier(.2,.75,.15,1)' }).onfinish = () => s.remove();
+    });
+  }
+  if (!reduce) {
+    document.addEventListener('pointerdown', e => {
+      if (e.button !== 0 || e.target.closest('input, textarea, .palette')) return;
+      sparks(e.clientX, e.clientY);
+    }, { passive: true });
+  }
+
+  /* ======================================================================
      Language & theme
      ====================================================================== */
   const offIO = new IntersectionObserver(entries => entries.forEach(en => {
@@ -646,7 +884,7 @@
     });
   }), { rootMargin: '120px 0px' });
   function watchOffscreen() {
-    ['#hero', '#projectGrid', '#marquee', '#wordmark', '#terminal', '.contact'].forEach(sel => {
+    ['#hero', '#projectGrid', '#marquee', '#wordmark', '#terminal', '.contact', '#expList', '#eduGrid', '#storyStage'].forEach(sel => {
       const el = $(sel);
       if (!el) return;
       offIO.unobserve(el);
@@ -661,12 +899,14 @@
     renderProjects();
     renderSkills();
     renderEducation();
+    renderStory();
     startRoles();
     updateTime();
     bindTilt();
     bindMagnetic();
     observeReveals(instant);
     watchOffscreen();
+    rebuildRoute();
     if (termStarted) typeTerminal(true);
     requestAnimationFrame(() => { moveInd(activeLink); onScroll(); });
     if (paletteOpen) renderPalette();
@@ -697,7 +937,7 @@
     root.dataset.theme = next;
     store.set('theme', next);
     $('meta[name="theme-color"]').setAttribute('content', next === 'light' ? '#f5f4ef' : '#07080c');
-    window.VRP && window.VRP.refresh();
+    refreshVisuals();
   }
 
   // Circular reveal of the new state, expanding from the given button.
@@ -735,7 +975,7 @@
       if (next === 'aurora') delete root.dataset.accent;
       else root.dataset.accent = next;
       store.set('accent', next);
-      window.VRP && window.VRP.refresh();
+      refreshVisuals();
     });
     toast(`${t('ui.accent')}: ${t('ui.accents')[next]}`);
   }

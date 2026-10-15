@@ -43,6 +43,10 @@ window.CONTENT = {
       select: 'select',
       close: 'close',
       konya: 'Konya, TR',
+      depot: 'Depot',
+      mo: 'mo', yr: 'yr',
+      drag3d: 'Drag to orbit',
+      route: 'Page route',
       loading: 'Optimizing routes',
       accent: 'Accent color',
       accents: { aurora: 'Aurora', sunset: 'Sunset', ocean: 'Ocean', lime: 'Neon' }
@@ -79,6 +83,7 @@ window.CONTENT = {
       items: [
         {
           company: 'Anadolu Birlik Holding',
+          icon: 'route', start: '2026-03', logo: '',
           role: 'Software Engineer',
           location: 'Konya, Turkey',
           period: 'Mar 2026 — Present',
@@ -95,6 +100,7 @@ window.CONTENT = {
         },
         {
           company: 'Yandex',
+          icon: 'search', start: '2024-10', end: '2025-01', logo: '',
           role: 'Search Engine Quality Improvement Specialist',
           location: 'Remote',
           period: 'Oct 2024 — Jan 2025',
@@ -148,6 +154,17 @@ window.CONTENT = {
       ],
       more: { title: 'More on GitHub', body: 'Experiments, coursework and side projects live on my GitHub profile.', cta: 'Visit profile' }
     },
+    story: {
+      label: 'How TRP works',
+      title: 'The life of a route.',
+      hint: 'Scroll',
+      steps: [
+        { k: 'Demand', t: 'Outlets land on the map', d: 'The week’s sales outlets are synced from the corporate system (Pansis) and placed on the map.' },
+        { k: 'Clustering', t: 'Territories and weekdays', d: 'Clustering and regional distribution split the outlets across field reps and weekdays.' },
+        { k: 'Routing', t: 'Best order on real roads', d: 'OR-Tools sequences every route using real road distances from our self-hosted OSRM.' },
+        { k: 'Field', t: 'Reps hit the road, the office watches', d: 'Reps follow their ordered stops in the PWA, even offline; managers watch plan vs. actual live.' }
+      ]
+    },
     skills: {
       label: 'Skills',
       title: 'The toolbox.',
@@ -165,9 +182,9 @@ window.CONTENT = {
       coursework: ['Data Structures', 'Algorithms', 'Cybersecurity', 'Database Management', 'Machine Learning'],
       certsTitle: 'Certifications',
       certs: [
-        { title: 'AI Training', issuer: 'Samsung Innovation Campus', year: '2025' },
-        { title: 'Data Analysis School', issuer: 'Council of Higher Education (YÖK)' },
-        { title: 'Data Science Professional Certificate & Generative AI', issuer: 'IBM' }
+        { title: 'AI Training', issuer: 'Samsung Innovation Campus', year: '2025', icon: 'cpu' },
+        { title: 'Data Analysis School', issuer: 'Council of Higher Education (YÖK)', icon: 'chart' },
+        { title: 'Data Science Professional Certificate & Generative AI', issuer: 'IBM', icon: 'database' }
       ]
     },
     contact: {
@@ -211,6 +228,10 @@ window.CONTENT = {
       select: 'seç',
       close: 'kapat',
       konya: 'Konya, TR',
+      depot: 'Depo',
+      mo: 'ay', yr: 'yıl',
+      drag3d: 'Sürükleyerek çevir',
+      route: 'Sayfa rotası',
       loading: 'Rotalar optimize ediliyor',
       accent: 'Vurgu rengi',
       accents: { aurora: 'Aurora', sunset: 'Gün batımı', ocean: 'Okyanus', lime: 'Neon' }
@@ -247,6 +268,7 @@ window.CONTENT = {
       items: [
         {
           company: 'Anadolu Birlik Holding',
+          icon: 'route', start: '2026-03', logo: '',
           role: 'Yazılım Mühendisi',
           location: 'Konya, Türkiye',
           period: 'Mart 2026 — Günümüz',
@@ -263,6 +285,7 @@ window.CONTENT = {
         },
         {
           company: 'Yandex',
+          icon: 'search', start: '2024-10', end: '2025-01', logo: '',
           role: 'Arama Motoru Kalite İyileştirme Uzmanı',
           location: 'Uzaktan',
           period: 'Eki 2024 — Oca 2025',
@@ -316,6 +339,17 @@ window.CONTENT = {
       ],
       more: { title: 'Daha fazlası GitHub’da', body: 'Deneyler, ders projeleri ve yan projeler GitHub profilimde.', cta: 'Profili ziyaret et' }
     },
+    story: {
+      label: 'TRP nasıl çalışır',
+      title: 'Bir rotanın doğuşu.',
+      hint: 'Kaydır',
+      steps: [
+        { k: 'Talep', t: 'Satış noktaları haritaya düşer', d: 'Haftalık ziyaret edilecek satış noktaları kurumsal sistemden (Pansis) senkronize edilip haritaya yerleşir.' },
+        { k: 'Kümeleme', t: 'Bölgeler ve günler belirlenir', d: 'Noktalar kümeleme ve bölgesel dağıtımla plasiyerlere ve haftanın günlerine paylaştırılır.' },
+        { k: 'Rotalama', t: 'Gerçek yollarda en iyi sıra', d: 'Kendi sunucumuzdaki OSRM’den gelen gerçek yol mesafeleriyle OR-Tools her rotayı sıralar.' },
+        { k: 'Saha', t: 'Plasiyer yola çıkar, ofis izler', d: 'Plasiyer PWA’da sıralı durakları çevrimdışı bile takip eder; yöneticiler plan ile gerçekleşeni canlı izler.' }
+      ]
+    },
     skills: {
       label: 'Yetenekler',
       title: 'Alet çantam.',
@@ -333,9 +367,9 @@ window.CONTENT = {
       coursework: ['Veri Yapıları', 'Algoritmalar', 'Siber Güvenlik', 'Veritabanı Yönetimi', 'Makine Öğrenmesi'],
       certsTitle: 'Sertifikalar',
       certs: [
-        { title: 'Yapay Zekâ Eğitimi', issuer: 'Samsung Innovation Campus', year: '2025' },
-        { title: 'Veri Analizi Okulu', issuer: 'Yükseköğretim Kurulu (YÖK)' },
-        { title: 'Veri Bilimi Profesyonel Sertifikası & Üretken Yapay Zekâ', issuer: 'IBM' }
+        { title: 'Yapay Zekâ Eğitimi', issuer: 'Samsung Innovation Campus', year: '2025', icon: 'cpu' },
+        { title: 'Veri Analizi Okulu', issuer: 'Yükseköğretim Kurulu (YÖK)', icon: 'chart' },
+        { title: 'Veri Bilimi Profesyonel Sertifikası & Üretken Yapay Zekâ', issuer: 'IBM', icon: 'database' }
       ]
     },
     contact: {

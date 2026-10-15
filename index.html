@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css?v=11">
+  <link rel="stylesheet" href="assets/css/style.css?v=21">
 
   <script>
     // Apply saved/system language & theme before first paint (no flash).
@@ -33,6 +33,8 @@
       if (!seen && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) d.classList.add('intro');
     })();
   </script>
+  <link rel="stylesheet" href="assets/switcher/switcher.css?v=1">
+  <script src="assets/switcher/switcher.js?v=1" data-current="v1"></script>
 </head>
 <body>
   <a class="skip-link" href="#about">Skip to content</a>
@@ -54,6 +56,9 @@
     </div>
   </div>
   <div class="progress" aria-hidden="true"><span></span></div>
+  <nav class="page-route" id="pageRoute" data-i18n-aria="ui.route">
+    <div class="pr-track" aria-hidden="true"><i class="pr-fill"></i><i class="pr-veh"></i></div>
+  </nav>
   <div class="cursor-ring out" aria-hidden="true"></div>
 
   <!-- ============ NAV ============ -->
@@ -173,6 +178,7 @@
     <!-- ============ ABOUT ============ -->
     <section class="section" id="about">
       <div class="container">
+        <span class="ghost-num" aria-hidden="true">01</span>
         <header class="section-head reveal"><span class="section-index">01</span><span class="section-label" data-i18n="about.label"></span><span class="section-rule"></span></header>
         <div class="about-grid">
           <div>
@@ -191,6 +197,7 @@
     <!-- ============ EXPERIENCE ============ -->
     <section class="section" id="experience">
       <div class="container">
+        <span class="ghost-num" aria-hidden="true">02</span>
         <header class="section-head reveal"><span class="section-index">02</span><span class="section-label" data-i18n="experience.label"></span><span class="section-rule"></span></header>
         <h2 class="section-title split reveal" data-i18n="experience.title" data-split></h2>
         <div class="timeline" id="expList"></div>
@@ -200,17 +207,35 @@
     <!-- ============ PROJECTS ============ -->
     <section class="section" id="projects">
       <div class="container">
+        <span class="ghost-num" aria-hidden="true">03</span>
         <header class="section-head reveal"><span class="section-index">03</span><span class="section-label" data-i18n="projects.label"></span><span class="section-rule"></span></header>
         <h2 class="section-title split reveal" data-i18n="projects.title" data-split></h2>
         <div class="projects-grid" id="projectGrid"></div>
       </div>
     </section>
 
+    <!-- ============ STORY (scroll-driven 3D) ============ -->
+    <section class="story" id="story">
+      <div class="story-sticky">
+        <div class="story-stage" id="storyStage" data-stage="0"></div>
+        <div class="container story-ui">
+          <header class="section-head"><span class="section-index">TRP</span><span class="section-label" data-i18n="story.label"></span><span class="section-rule"></span></header>
+          <h2 class="story-title" data-i18n="story.title"></h2>
+          <ol class="story-steps" id="storySteps"></ol>
+        </div>
+        <div class="story-hint" aria-hidden="true"><span data-i18n="story.hint"></span><i></i></div>
+      </div>
+    </section>
+
     <!-- ============ SKILLS ============ -->
     <section class="section" id="skills">
       <div class="container">
+        <span class="ghost-num" aria-hidden="true">04</span>
         <header class="section-head reveal"><span class="section-index">04</span><span class="section-label" data-i18n="skills.label"></span><span class="section-rule"></span></header>
-        <h2 class="section-title split reveal" data-i18n="skills.title" data-split></h2>
+        <div class="skills-top">
+          <h2 class="section-title split reveal" data-i18n="skills.title" data-split></h2>
+          <div class="orb reveal" id="skillOrb" aria-hidden="true"></div>
+        </div>
         <div class="skills-grid" id="skillGrid"></div>
       </div>
       <div class="marquee reveal" id="marquee" aria-hidden="true"></div>
@@ -219,6 +244,7 @@
     <!-- ============ EDUCATION ============ -->
     <section class="section" id="education">
       <div class="container">
+        <span class="ghost-num" aria-hidden="true">05</span>
         <header class="section-head reveal"><span class="section-index">05</span><span class="section-label" data-i18n="education.label"></span><span class="section-rule"></span></header>
         <h2 class="section-title split reveal" data-i18n="education.title" data-split></h2>
         <div class="edu-grid" id="eduGrid"></div>
@@ -292,8 +318,9 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="assets/js/data.js?v=11"></script>
-  <script src="assets/js/vrp.js?v=11"></script>
-  <script src="assets/js/main.js?v=11"></script>
+  <script src="assets/js/data.js?v=21"></script>
+  <script src="assets/js/vrp.js?v=21"></script>
+  <script src="assets/js/main.js?v=21"></script>
+  <script src="assets/js/aurora.js?v=21"></script>
 </body>
 </html>

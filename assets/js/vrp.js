@@ -65,7 +65,7 @@
       e.off = true;
       if (!connected()) e.off = false;
     }
-    return { nodes, edges: edges.filter(e => !e.off) };
+    return { nodes, edges: edges.filter(e => !e.off), xs, ys };
   }
 
   function dijkstra(nodes, src) {
@@ -234,9 +234,10 @@
     return {
       depot,
       streets: net.edges,
+      grid: { xs: net.xs, ys: net.ys },
       routes: sol.routes.map((r, i) => {
         const g = routeGeometry(router, r.seq, laneFor(i, k));
-        return { color: i % 4, d: toPath(g.pts), len: g.len, stops: r.seq.filter(p => p !== depot) };
+        return { color: i % 4, d: toPath(g.pts), len: g.len, pts: g.pts.map(q => ({ x: q.x, y: q.y })), stops: r.seq.filter(p => p !== depot) };
       })
     };
   }

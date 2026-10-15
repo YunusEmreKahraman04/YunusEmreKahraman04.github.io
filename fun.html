@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>YEK Strike — Yunus Emre Kahraman</title>
+  <meta name="description" content="A Counter-Strike replica in the browser: awp_lego and aim_redline, peer-to-peer multiplayer, no server.">
+  <meta name="theme-color" content="#0b0c0f">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0c0f'/%3E%3Ccircle cx='32' cy='32' r='15' fill='none' stroke='%23ffb400' stroke-width='4'/%3E%3Cpath d='M32 8v14M32 42v14M8 32h14M42 32h14' stroke='%23ffb400' stroke-width='4'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+  <script type="importmap">
+    { "imports": {
+      "three": "./assets/vendor/three/build/three.module.min.js",
+      "three/addons/": "./assets/vendor/three/examples/jsm/"
+    } }
+  </script>
+  <link rel="modulepreload" href="assets/vendor/three/build/three.module.min.js">
+  <link rel="stylesheet" href="assets/fun/fun.css?v=4">
+  <link rel="stylesheet" href="assets/switcher/switcher.css?v=2">
+  <script src="assets/switcher/switcher.js?v=1" data-current="fun"></script>
+</head>
+<body>
+  <canvas id="game" aria-label="YEK Strike"></canvas>
+
+  <!-- ================= LOBBY ================= -->
+  <div class="lobby" id="lobby">
+    <header class="lb-top">
+      <a class="lb-back" href="index.html">← <span data-k="back"></span></a>
+      <span class="lb-net"><i></i><span id="online"></span></span>
+      <button type="button" class="lb-set" id="openXhair"><i aria-hidden="true">✛</i> <span data-k="crosshair"></span></button>
+      <button type="button" class="lb-set" id="openSettings"><i aria-hidden="true">⚙</i> <span data-k="settings"></span></button>
+      <span class="lb-lang" role="group" aria-label="Language"><button type="button" data-lang="tr">TR</button><button type="button" data-lang="en">EN</button></span>
+    </header>
+
+    <main class="lb-main">
+      <section class="lb-hero">
+        <p class="lb-kicker" data-k="kicker"></p>
+        <h1 class="lb-title">YEK<span>STRIKE</span></h1>
+        <p class="lb-sub" data-k="sub"></p>
+      </section>
+
+      <section class="lb-panel" aria-labelledby="srvHead">
+        <h2 id="srvHead" class="lb-h" data-k="servers"></h2>
+        <ul class="servers" id="servers"></ul>
+
+        <div class="lb-form">
+          <label class="fld"><span data-k="nick"></span><input id="nick" maxlength="16" autocomplete="nickname" spellcheck="false"></label>
+          <div class="fld"><span data-k="team"></span>
+            <div class="seg" id="teamSeg" role="group"><button type="button" data-v="auto" data-k="auto"></button><button type="button" data-v="T" class="t">T</button><button type="button" data-v="CT" class="ct">CT</button></div>
+          </div>
+          <div class="fld"><span data-k="rounds"></span>
+            <div class="seg seg-sm" id="roundSeg" role="group"><button type="button" data-v="0" data-k="dm"></button><button type="button" data-v="5">5</button><button type="button" data-v="10">10</button><button type="button" data-v="16">16</button><button type="button" data-v="24">24</button><button type="button" data-v="30">30</button></div>
+          </div>
+          <div class="fld"><span data-k="bots"></span>
+            <div class="seg" id="botSeg" role="group"><button type="button" data-v="true" data-k="on"></button><button type="button" data-v="false" data-k="off"></button></div>
+          </div>
+        </div>
+        <button type="button" class="play" id="play"><span data-k="play"></span><i aria-hidden="true">▶</i></button>
+        <p class="mobile-note" id="mobileNote" hidden data-k="desktop"></p>
+      </section>
+
+      <section class="lb-help">
+        <h2 class="lb-h" data-k="controls"></h2>
+        <dl class="keys">
+          <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd data-k="ctlMove"></dd>
+          <dt><kbd>Space</kbd></dt><dd data-k="ctlJump"></dd>
+          <dt><kbd>C</kbd> / <kbd>Ctrl</kbd></dt><dd data-k="ctlCrouch"></dd>
+          <dt><kbd>Shift</kbd></dt><dd data-k="ctlWalk"></dd>
+          <dt><kbd>LMB</kbd></dt><dd data-k="ctlFire"></dd>
+          <dt><kbd>RMB</kbd></dt><dd data-k="ctlAlt"></dd>
+          <dt><kbd>R</kbd></dt><dd data-k="ctlReload"></dd>
+          <dt><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></dt><dd data-k="ctlSwitch"></dd>
+          <dt><kbd>Q</kbd></dt><dd data-k="ctlLast"></dd>
+          <dt><kbd>Tab</kbd></dt><dd data-k="ctlBoard"></dd>
+          <dt><kbd>Y</kbd></dt><dd data-k="ctlChat"></dd>
+          <dt><kbd>B</kbd></dt><dd data-k="ctlBuy"></dd>
+          <dt><kbd>F</kbd></dt><dd data-k="ctlInspect"></dd>
+          <dt><kbd>M</kbd></dt><dd data-k="ctlTeam"></dd>
+        </dl>
+      </section>
+    </main>
+  </div>
+
+  <!-- ================= HUD ================= -->
+  <div class="hud" id="hud" hidden>
+    <div class="scope" id="scope" hidden aria-hidden="true"><i class="sc-h"></i><i class="sc-v"></i></div>
+    <canvas class="radar" id="radar" width="184" height="184" aria-hidden="true"></canvas>
+    <div class="score" aria-label="Score"><span class="s-ct"><small>CT</small><b id="scoreCT">0</b></span><i></i><span class="s-t"><b id="scoreT">0</b><small>T</small></span></div>
+    <p class="round-info" id="roundInfo"></p>
+    <div class="round-banner" id="roundBanner"></div>
+    <div class="hurt-fx" id="hurtFx" aria-hidden="true"></div>
+    <div class="peers" data-state="alone"><i></i><b id="peerCount">1</b> <span data-k="peers"></span></div>
+    <ol class="feed" id="feed" aria-live="polite"></ol>
+
+    <canvas class="xhair" id="xhair" aria-hidden="true"></canvas>
+    <p class="fps" id="fps" aria-hidden="true"></p>
+    <div class="kill-banner" id="killBanner" aria-live="polite"></div>
+    <div class="hitmark" id="hitmark" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div class="dmg" id="dmgDir" aria-hidden="true"></div>
+    <p class="center-msg" id="centerMsg" role="status"></p>
+    <p class="protect" id="protect" hidden data-k="protect"></p>
+    <div class="reload" id="reloadBar" hidden><i></i></div>
+
+    <ol class="chat" id="chatLog"></ol>
+    <div class="chat-box" id="chatBox" hidden><label for="chatInput">SAY:</label><input id="chatInput" maxlength="120" autocomplete="off" spellcheck="false" data-k-ph="chatPh"></div>
+
+    <div class="money"><b id="moneyVal">$0</b><span class="buy-ico">B</span></div>
+    <div class="vitals">
+      <span class="hp"><i aria-hidden="true">✚</i><b id="hpVal">100</b><span class="hp-bar"><i id="hpBar"></i></span></span>
+      <span class="armor" hidden><i aria-hidden="true">⛨</i><b id="armorVal">0</b></span>
+    </div>
+    <div class="arms">
+      <ol class="slots" id="slots"></ol>
+      <span class="wname" id="wName"></span>
+      <span class="ammo"><b id="ammoVal">30</b><small id="ammoRes">/ 90</small></span>
+    </div>
+
+    <div class="death" id="death" hidden><p id="deathBy"></p><p class="death-t" id="deathT"></p></div>
+    <div class="board" id="board" hidden></div>
+  </div>
+
+  <!-- ================= PAUSE / SETTINGS ================= -->
+  <div class="pause" id="pause" hidden>
+    <div class="pause-card">
+      <button type="button" class="pause-play" id="pausePlay"><span data-k="clickToPlay"></span></button>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-tab="game" aria-selected="true" data-k="tabGame"></button>
+        <button type="button" role="tab" data-tab="xhair" aria-selected="false" data-k="tabXhair"></button>
+        <button type="button" role="tab" data-tab="gfx" aria-selected="false" data-k="tabGfx"></button>
+      </div>
+
+      <section class="pane" data-pane="game">
+        <label class="row"><span data-k="sens"></span><input type="range" id="sens" min="0.1" max="8" step="0.01"><input type="number" class="num" id="sensOut" min="0.1" max="8" step="0.01" aria-label="sensitivity"></label>
+        <label class="row"><span data-k="fov"></span><input type="range" id="fovIn" min="60" max="95" step="1"><output id="fovInOut"></output></label>
+        <label class="row"><span data-k="vol"></span><input type="range" id="vol" min="0" max="1" step="0.05"><output id="volOut"></output></label>
+        <div class="toggles"><label class="tg"><input type="checkbox" id="fsToggle"><i></i><span data-k="fullscreen"></span></label></div>
+      </section>
+
+      <section class="pane" data-pane="xhair" hidden>
+        <div class="xh-preview"><canvas id="xhairPreview"></canvas></div>
+        <div class="row"><span data-k="xColor"></span><div class="swatches" id="xColors"></div></div>
+        <label class="row"><span data-k="xSize"></span><input type="range" id="xSize" min="2" max="16" step="1"><output id="xSizeOut"></output></label>
+        <label class="row"><span data-k="xGap"></span><input type="range" id="xGap" min="-4" max="12" step="1"><output id="xGapOut"></output></label>
+        <label class="row"><span data-k="xThick"></span><input type="range" id="xThick" min="1" max="4" step="1"><output id="xThickOut"></output></label>
+        <label class="row"><span data-k="xAlpha"></span><input type="range" id="xAlpha" min="0.2" max="1" step="0.05"><output id="xAlphaOut"></output></label>
+        <div class="toggles">
+          <label class="tg"><input type="checkbox" id="xDot"><i></i><span data-k="xDot"></span></label>
+          <label class="tg"><input type="checkbox" id="xOutline"><i></i><span data-k="xOutline"></span></label>
+          <label class="tg"><input type="checkbox" id="xDynamic"><i></i><span data-k="xDynamic"></span></label>
+          <label class="tg"><input type="checkbox" id="xT"><i></i><span data-k="xT"></span></label>
+        </div>
+        <button type="button" class="pause-lobby" id="xReset" data-k="xReset"></button>
+      </section>
+
+      <section class="pane" data-pane="gfx" hidden>
+        <div class="row"><span data-k="preset"></span>
+          <div class="seg" id="presetSeg"><button type="button" data-v="low" data-k="pLow"></button><button type="button" data-v="medium" data-k="pMed"></button><button type="button" data-v="high" data-k="pHigh"></button><button type="button" data-v="ultra" data-k="pUltra"></button></div>
+        </div>
+        <div class="row"><span data-k="fpsCap"></span>
+          <div class="seg seg-sm" id="capSeg"><button type="button" data-v="30">30</button><button type="button" data-v="60">60</button><button type="button" data-v="120">120</button><button type="button" data-v="144">144</button><button type="button" data-v="240">240</button><button type="button" data-v="0">∞</button></div>
+        </div>
+        <label class="row"><span data-k="scale"></span><input type="range" id="gScale" min="0.5" max="1" step="0.05"><output id="gScaleOut"></output></label>
+        <div class="row"><span data-k="shadows"></span>
+          <div class="seg" id="shadowSeg"><button type="button" data-v="off" data-k="sOff"></button><button type="button" data-v="low" data-k="sLow"></button><button type="button" data-v="high" data-k="sHigh"></button><button type="button" data-v="ultra" data-k="sUltra"></button></div>
+        </div>
+        <div class="toggles">
+          <label class="tg"><input type="checkbox" id="gAuto"><i></i><span data-k="autoRes"></span></label>
+          <label class="tg"><input type="checkbox" id="gBloom"><i></i><span data-k="bloom"></span></label>
+          <label class="tg"><input type="checkbox" id="gAA"><i></i><span data-k="aa"></span></label>
+          <label class="tg"><input type="checkbox" id="gFps"><i></i><span data-k="fpsShow"></span></label>
+        </div>
+        <p class="hz" id="refreshHz"></p>
+      </section>
+
+      <button type="button" class="pause-lobby" id="pauseLobby" data-k="toLobby"></button>
+      <button type="button" class="pause-lobby" id="pauseClose" data-k="close"></button>
+    </div>
+  </div>
+
+  <!-- ================= BUY MENU ================= -->
+  <div class="buy" id="buy" hidden>
+    <div class="buy-card">
+      <header class="buy-head"><b data-k="buy"></b><span class="buy-money" id="buyMoney">$0</span><span class="buy-hint" data-k="buyHint"></span><button type="button" class="buy-x" id="buyClose" aria-label="close">✕</button></header>
+      <div class="buy-cols" id="buyCols"></div>
+    </div>
+  </div>
+
+  <noscript><p class="nojs">YEK Strike needs JavaScript and WebGL.</p></noscript>
+  <script type="module" src="assets/fun/main.js?v=4"></script>
+</body>
+</html>

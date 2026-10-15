@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="tr" data-chapter="city" data-single="1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Yunus Emre Kahraman — 01</title>
+  <meta name="description" content="Yunus Emre Kahraman — Computer Engineer. Route optimization, backend microservices, data pipelines, edge AI.">
+  <meta name="theme-color" content="#04050b">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2304050b'/%3E%3Cpath d='M14 46V30h8v16M26 46V18h10v28M40 46V26h10v20' fill='none' stroke='%234cf2ff' stroke-width='4'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@400;600;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@400;600;800&display=swap"></noscript>
+  <script type="importmap">
+    { "imports": {
+      "three": "./assets/vendor/three/build/three.module.min.js",
+      "three/addons/": "./assets/vendor/three/examples/jsm/"
+    } }
+  </script>
+  <link rel="modulepreload" href="assets/vendor/three/build/three.module.min.js">
+  <link rel="stylesheet" href="assets/shared/base.css?v=5">
+  <link rel="stylesheet" href="assets/city/city.css?v=7">
+  <link rel="stylesheet" href="assets/city/hud.css?v=3">
+  <link rel="stylesheet" href="assets/city/ops.css?v=3">
+  <link rel="stylesheet" href="assets/switcher/switcher.css?v=1">
+  <script src="assets/switcher/switcher.js?v=1" data-current="v2"></script>
+</head>
+<body>
+  <a class="skip" href="#cityMain" data-t-skip>Skip to content</a>
+  <canvas id="city" aria-hidden="true"></canvas>
+  <div class="sky" aria-hidden="true"></div>
+  <div class="veil" aria-hidden="true"></div>
+  <div class="callouts" id="callouts" aria-hidden="true"></div>
+
+  <div class="loader" id="loader" aria-hidden="true">
+    <i class="lh top"></i><i class="lh bot"></i><i class="lflash"></i>
+    <div class="boot">
+      <div class="boot-head"><span>YEK//OS <em>v26.10</em></span><span id="bootClock">T+0.00s</span></div>
+      <div class="boot-pct"><b id="loadPct">0</b><span>%</span></div>
+      <div class="boot-bar"><i id="bootBar"></i></div>
+      <p class="boot-sub"><span class="loader-grid"><i></i><i></i><i></i></span><span data-t="city.loading"></span></p>
+      <ol class="boot-log" id="bootLog"></ol>
+    </div>
+  </div>
+
+  <div class="hud" id="hud" aria-hidden="true">
+    <i class="hc tl"></i><i class="hc tr"></i><i class="hc bl"></i><i class="hc br"></i>
+    <div class="compass"><div class="compass-strip" id="compassStrip"></div><b class="compass-hd" id="hdg">000°</b></div>
+    <div class="ladder"><div class="ladder-strip" id="ladderStrip"></div><b class="ladder-v"><span id="alt">0000</span>m</b></div>
+  </div>
+  <div class="warp-lines" aria-hidden="true"></div>
+  <div class="warp-flash" aria-hidden="true"></div>
+
+  <div class="seq" id="seq" aria-hidden="true">
+    <div class="seq-k"><i></i><span id="seqPh">01/04</span><b id="seqTitle"></b></div>
+    <div class="seq-num"><b id="seqNum">0</b><span id="seqUnit">%</span></div>
+    <div class="seq-bar"><i id="seqBar"></i></div>
+    <p class="seq-sub" id="seqSub"></p>
+  </div>
+  <div class="wp" id="wp" aria-hidden="true"></div>
+
+  <aside class="ops" id="ops" aria-hidden="true">
+    <header><i class="rec"></i><span id="opsTitle">OPS</span><span id="opsClock"></span></header>
+    <canvas id="radar"></canvas>
+    <ul id="opsReps"></ul>
+    <ol id="opsFeed"></ol>
+  </aside>
+  <div class="reticle" id="reticle" aria-hidden="true"><i class="r-ring"></i><i class="r-x"></i><span id="reticleTxt"></span></div>
+
+  <header class="chapters">
+    <a class="brand" href="v2.html">YEK<span>.</span></a>
+    <nav id="chapterLinks" aria-label="Chapters"></nav>
+    <div class="ch-lang" role="group" data-t-aria="lang">
+      <button type="button" data-lang="tr">TR</button><button type="button" data-lang="en">EN</button>
+    </div>
+  </header>
+
+  <aside class="stops" aria-hidden="true">
+    <div class="stops-rail"><i id="stopsFill"></i></div>
+    <ol id="stopsList"></ol>
+  </aside>
+
+  <div class="solve" id="solve" role="status">
+    <i aria-hidden="true"></i><span id="solveText"></span>
+    <button type="button" id="solveReplay" aria-label="Replay / Tekrar oynat">↻</button>
+  </div>
+
+  <div class="readout" aria-hidden="true">
+    <span><i class="rec"></i><b id="stopLabel"></b> <b id="stopNum">01</b> / <span id="stopTot">19</span></span>
+    <span id="coords"></span>
+    <span class="telem" id="telem"></span>
+  </div>
+
+  <main class="city-main" id="cityMain">
+    <!-- ================= 01 CITY ================= -->
+    <section class="c-hero" id="sehir" data-shot="hero" data-ch="city">
+      <p class="c-kicker" data-t="city.kicker"></p>
+      <h1 class="c-title" aria-label="Yunus Emre Kahraman">
+        <span class="row" aria-hidden="true" data-split="YUNUS EMRE"></span>
+        <span class="row accent" aria-hidden="true" data-split="KAHRAMAN"></span>
+      </h1>
+      <p class="c-tagline" data-t="city.tagline"></p>
+      <div class="c-scroll"><span data-t="city.scroll"></span><i></i></div>
+    </section>
+
+    <section class="c-panel left" data-shot="about" data-ch="city">
+      <div class="glass" data-tilt3d="6">
+        <p class="label" data-depth="30"><span>01</span><span data-t="city.about.label"></span></p>
+        <h2 data-t="city.about.title" data-depth="50"></h2>
+        <div id="aboutBody"></div>
+      </div>
+    </section>
+
+    <section class="c-panel right" data-shot="facts" data-ch="city">
+      <div class="glass wide" data-tilt3d="6">
+        <p class="label"><span>02</span><span data-t="city.facts.label"></span></p>
+        <div class="facts" id="facts"></div>
+      </div>
+    </section>
+
+    <section class="c-panel left" data-shot="focus" data-ch="city">
+      <div class="glass" data-tilt3d="6">
+        <p class="label" data-depth="30"><span>03</span><span data-t="city.focus.label"></span></p>
+        <h2 data-t="city.focus.title" data-depth="50"></h2>
+        <ol class="focus" id="focus"></ol>
+        <p class="chase"><i class="rec"></i><span data-t="city.focus.chase"></span></p>
+      </div>
+    </section>
+
+    <!-- ================= 02 FIELD OPERATION ================= -->
+    <section class="op" id="isler" data-shot="w0" data-ch="work" data-anchor="hq"><article class="op-card"></article></section>
+    <section class="op" data-shot="brief" data-ch="work" data-anchor="table"><article class="op-card"></article></section>
+    <section class="op" data-shot="cab" data-ch="work" data-anchor="phone"><article class="op-card"></article></section>
+    <section class="op" data-shot="hq" data-ch="work" data-anchor="screen"><article class="op-card"></article></section>
+    <section class="op" data-shot="roles" data-ch="work" data-anchor="roles"><article class="op-card"></article></section>
+    <section class="op" data-shot="sync" data-ch="work" data-anchor="dlq"><article class="op-card"></article></section>
+    <section class="op" data-shot="dock" data-ch="work" data-anchor="silo"><article class="op-card right"></article></section>
+    <section class="op" data-shot="edge" data-ch="work" data-anchor="cam"><article class="op-card"></article></section>
+    <section class="op" data-shot="prod" data-ch="work" data-anchor="rack"><article class="op-card"></article></section>
+
+    <!-- ================= 03 COMMAND CENTER ================= -->
+    <section class="op" id="sistem" data-shot="s0" data-ch="system" data-anchor="console"><article class="op-card"></article></section>
+    <section class="op" data-shot="skills" data-ch="system" data-anchor="locker"><article class="op-card wide"></article></section>
+    <section class="op" data-shot="edu" data-ch="system" data-anchor="wall"><article class="op-card right"></article></section>
+    <section class="op" data-shot="certs" data-ch="system" data-anchor="badges"><article class="op-card"></article></section>
+    <section class="op op-radio" data-shot="term" data-ch="system">
+      <article class="op-card term">
+        <p class="op-ev"><i></i><span class="ev-k"></span><b class="ev-line"></b></p>
+        <div class="term-out" id="termOut" aria-live="polite"></div>
+        <form class="term-in" id="termForm" autocomplete="off">
+          <label for="termInput" class="prompt">yek@ops:~$</label>
+          <input id="termInput" type="text" spellcheck="false" autocapitalize="off" data-t-ph="system.comms.placeholder">
+        </form>
+        <div class="quick" id="quick"></div>
+      </article>
+    </section>
+    <section class="op op-out" data-shot="out" data-ch="system"><article class="op-card mid"></article></section>
+  </main>
+
+  <svg class="leader" id="leader" aria-hidden="true"><path id="leaderPath"></path><circle id="leaderDot" r="5"></circle><circle id="leaderRing" r="14"></circle></svg>
+  <div class="edgecam" id="edgecam" aria-hidden="true"><div class="ec-boxes" id="ecBoxes"></div><div class="ec-hud"><span class="ec-rec"><i></i>REC · CAM-07</span><span id="ecClock"></span><span>YOLOv8 · HAILO</span><span id="ecCount"></span></div></div>
+  <div class="cabhud" id="cabhud" aria-hidden="true">
+    <svg class="tach" viewBox="0 0 200 150">
+      <path class="tk-bg" pathLength="100" d="M30.7 140 A80 80 0 1 1 169.3 140"/>
+      <path class="tk-red" pathLength="100" d="M30.7 140 A80 80 0 1 1 169.3 140"/>
+      <path class="tk-fg" id="tachArc" pathLength="100" d="M30.7 140 A80 80 0 1 1 169.3 140"/>
+      <g class="tk-ticks" id="tachTicks"></g>
+      <line class="tk-needle" id="tachNeedle" x1="100" y1="100" x2="100" y2="34"/>
+      <circle cx="100" cy="100" r="6" class="tk-hub"/>
+      <text x="100" y="128" class="tk-rpm" id="cabRpm">0.8</text><text x="100" y="142" class="tk-u">×1000 rpm</text>
+    </svg>
+    <div class="cab-mid"><span id="cabSpd">000</span><small>km/h</small><b class="gear" id="cabGear">N</b></div>
+    <div class="cab-side"><b id="cabNext"></b><em id="cabTake"></em></div>
+  </div>
+
+  <script>
+    // safety net: if the 3D never reports in, show the page anyway (city.js upgrades it if it arrives later)
+    setTimeout(function () { var d = document.documentElement; if (!d.classList.contains('ready')) d.classList.add('ready', 'no-webgl'); }, 8000);
+  </script>
+  <script src="assets/shared/content.js?v=7"></script>
+  <script src="assets/shared/core.js?v=6"></script>
+  <script src="assets/shared/sound.js?v=3"></script>
+  <script src="assets/shared/tilt3d.js?v=3"></script>
+  <script src="assets/city/opsui.js?v=2"></script>
+  <script type="module" src="assets/city/city.js?v=24"></script>
+</body>
+</html>
