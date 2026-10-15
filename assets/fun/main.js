@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import { MAPS, MAP_ORDER } from './maps.js';
 import { buildWorld } from './world.js';
 import { BODY, pmove, rayWorld, rayFace, rayBodyZones } from './physics.js';
-import { WEAPONS, WEAPON_IDS, ARMOR, BUY_GROUPS, teamPistol, ViewModel, setGunEnv } from './weapons.js';
+import { WEAPONS, WEAPON_IDS, ARMOR, BUY_GROUPS, teamPistol, ViewModel, setGunEnv, loadGunPack } from './weapons.js';
+import { loadCharacters } from './character.js';
 import { Gfx, GFX_DEFAULTS, PRESETS } from './gfx.js';
 import { Avatar, GUN_MAT } from './avatar.js';
 import { thirdPersonGun } from './weapons.js';
@@ -892,7 +893,7 @@ function gameFrame(dt) {
     const onGround = mine ? x.body.onGround : x.disp.onGround;
     const alive = mine ? x.alive : x.disp.alive;
     x.avatar.setWeapon(mine ? x.w : x.disp.w);
-    x.avatar.update(dt, { p, yaw: mine ? x.yaw : x.disp.yaw, pitch: mine ? x.pitch : x.disp.pitch, crouch: mine ? x.body.h < BODY.h : x.disp.crouch, alive, speed: Math.min(speed, 7), showTag: x.team === me.team || G.aimEnt === x, protected: isProt(x) });
+    x.avatar.update(dt, { p, yaw: mine ? x.yaw : x.disp.yaw, pitch: mine ? x.pitch : x.disp.pitch, crouch: mine ? x.body.h < BODY.h : x.disp.crouch, alive, speed: Math.min(speed, 7), onGround, showTag: x.team === me.team || G.aimEnt === x, protected: isProt(x) });
     if (alive && onGround && speed > 3.4) {
       x.stepT -= dt;
       if (x.stepT <= 0) { x.stepT = 0.36; sfx.step(p, 0.4); }
@@ -1368,8 +1369,15 @@ function announce() {
   const score = G.R.on ? G.R.wins.CT + ':' + G.R.wins.T + ' · R' + G.R.n : '';
   lobby.set({ r: G.room, n: G.me ? G.me.name : clean(settings.name), h: !!G.host, p: humans, b: bots, s: score });
 }
-function enter(roomId) {
+// models (CC0, Quaternius) load in the background while the lobby is open
+const MODELS = 'assets/fun/models/';
+const assets = Promise.all([loadGunPack(MODELS), loadCharacters(MODELS)]).catch(e => console.warn('[assets] using built-in models', e));
+async function enter(roomId) {
   if (coarse) return;
+  const label = $('#play').querySelector('span'), was = label.textContent;
+  label.textContent = '…';
+  await assets;
+  label.textContent = was;
   settings.name = clean(nick.value); nick.value = settings.name; saveSettings();
   sfx.unlock();
   closeLobbies();

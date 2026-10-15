@@ -98,10 +98,52 @@ export function gunMaterials() {
     grey: std('#4a4e54', 0.5, 0.45), tan: std('#9a8a68', 0.1, 0.6), olive: std('#56653f', 0.15, 0.58), green: std('#4f5a3a', 0.15, 0.55),
     wood: std('#a8805f', 0, 0.5, { map: woodTexture() }), bake: std('#6b3418', 0.05, 0.42),
     steel: std('#c9cdd3', 1, 0.2), blade: std('#dfe3e8', 1, 0.12), brass: std('#d4a640', 1, 0.28),
-    lens: std('#2a4f9e', 1, 0.04, { emissive: '#0b1a40' }), rubber: std('#141414', 0, 0.9), clear: std('#6b6250', 0.1, 0.25)
+    lens: std('#2a4f9e', 1, 0.04, { emissive: '#0b1a40' }), rubber: std('#141414', 0, 0.9), clear: std('#6b6250', 0.1, 0.25),
+    packPlain: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.05, roughness: 0.6 }),
+    packMetal: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.7, roughness: 0.32 })
   });
   return M;
 }
+// Quaternius' Ultimate Gun Pack (CC0), pre-baked into game space by tools/build_guns.py:
+// grip at the origin, barrel down -z, metres. Records are 20 bytes each.
+const PACK = {};
+export async function loadGunPack(base) {
+  const [idx, bin] = await Promise.all([fetch(base + 'guns.json').then(r => r.json()), fetch(base + 'guns.bin').then(r => r.arrayBuffer())]);
+  const dv = new DataView(bin), stride = idx.stride;
+  for (const [id, e] of Object.entries(idx.weapons)) {
+    const parts = [{ p: [], n: [], c: [] }, { p: [], n: [], c: [] }];
+    for (let k = 0; k < e.count; k++) {
+      const o = (e.offset + k) * stride;
+      const part = parts[dv.getUint8(o + 18) ? 1 : 0];
+      part.p.push(dv.getFloat32(o, true), dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true));
+      part.n.push(dv.getInt8(o + 12) / 127, dv.getInt8(o + 13) / 127, dv.getInt8(o + 14) / 127);
+      part.c.push(dv.getUint8(o + 15) / 255, dv.getUint8(o + 16) / 255, dv.getUint8(o + 17) / 255);
+    }
+    PACK[id] = {
+      geos: parts.map(q => {
+        if (!q.p.length) return null;
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(q.p, 3));
+        g.setAttribute('normal', new THREE.Float32BufferAttribute(q.n, 3));
+        g.setAttribute('color', new THREE.Float32BufferAttribute(q.c, 3));
+        g.computeBoundingSphere();
+        return g;
+      }),
+      muzzle: e.muzzle, hand: e.hand, port: e.port
+    };
+  }
+}
+function packModel(id) {
+  const P = PACK[id], m = gunMaterials();
+  const g = new THREE.Group();
+  P.geos.forEach((geo, i) => { if (geo) { const mesh = new THREE.Mesh(geo, i ? m.packMetal : m.packPlain); mesh.castShadow = true; g.add(mesh); } });
+  const muzzle = new THREE.Object3D(), port = new THREE.Object3D(), mag = new THREE.Group();
+  muzzle.position.fromArray(P.muzzle); port.position.fromArray(P.port);
+  g.add(mag, muzzle, port);
+  g.userData = { muzzle, port, mag, bolt: null, slide: null, pump: null, hand: P.hand };
+  return g;
+}
+
 export function setGunEnv(env) {
   const m = gunMaterials();
   for (const k in m) { m[k].envMap = env; m[k].needsUpdate = true; }
@@ -288,6 +330,7 @@ function knife(m) {
 
 // Gun points down -z with the grip at the origin. userData holds refs for animation.
 export function gunModel(id) {
+  if (PACK[id]) return packModel(id);
   const m = gunMaterials();
   const r = id === 'knife' ? knife(m) : PISTOL[id] ? pistol(PISTOL[id], m) : longGun(SPEC[id] || SPEC.ak47, m);
   r.g.add(r.mag, r.muzzle, r.port);

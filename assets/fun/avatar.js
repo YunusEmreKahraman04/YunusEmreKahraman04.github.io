@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeStatic, thirdPersonGun, WEAPONS } from './weapons.js';
+import { SkinAvatar, charactersReady } from './character.js';
 
 const LOOK = {
   T: { shirt: '#9c7446', pants: '#5d4c37', vest: '#4a4434', head: '#2a2622', skin: '#c99068', glove: '#3b2f24', boot: '#2a211a', accent: '#8e1d18', tag: '#ffb347' },
@@ -48,7 +49,11 @@ function limb(key, build) {
 }
 
 export { GUN_MAT };
+// skinned Toon Shooter characters when they've loaded, the blocky operator otherwise
 export class Avatar {
+  constructor(team, name) { return charactersReady() ? new SkinAvatar(team, name) : new BoxAvatar(team, name); }
+}
+class BoxAvatar {
   constructor(team, name) {
     const L = LOOK[team] || LOOK.T;
     this.team = team;

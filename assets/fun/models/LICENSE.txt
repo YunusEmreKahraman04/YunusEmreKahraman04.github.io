@@ -1,0 +1,13 @@
+3D models used by YEK Strike (fun.html)
+
+guns.bin / guns.json
+  "Ultimate Gun Pack" by Quaternius - CC0 1.0 (public domain)
+  https://quaternius.com - https://opengameart.org/content/low-poly-guns-pack
+  Converted to a compact binary (grip at origin, metres) by a small build script.
+
+ct.glb / t.glb
+  "Toon Shooter Game Kit" (Character_Soldier, Character_Enemy) by Quaternius - CC0 1.0
+  https://quaternius.com/packs/toonshootergamekit.html
+  Repacked as binary glTF with unused animations removed.
+
+CC0: https://creativecommons.org/publicdomain/zero/1.0/
