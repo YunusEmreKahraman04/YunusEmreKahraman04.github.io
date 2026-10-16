@@ -17,7 +17,7 @@
     } }
   </script>
   <link rel="modulepreload" href="assets/vendor/three/build/three.module.min.js">
-  <link rel="stylesheet" href="assets/fun/fun.css?v=6">
+  <link rel="stylesheet" href="assets/fun/fun.css?v=7">
   <link rel="stylesheet" href="assets/switcher/switcher.css?v=2">
   <script src="assets/switcher/switcher.js?v=1" data-current="fun"></script>
 </head>
@@ -70,7 +70,8 @@
         <dl class="keys">
           <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd data-k="ctlMove"></dd>
           <dt><kbd>Space</kbd></dt><dd data-k="ctlJump"></dd>
-          <dt><kbd>C</kbd> / <kbd>Ctrl</kbd></dt><dd data-k="ctlCrouch"></dd>
+          <dt><kbd>Ctrl</kbd> / <kbd>X</kbd></dt><dd data-k="ctlCrouch"></dd>
+          <dt><kbd>C</kbd></dt><dd data-k="ctlPanic"></dd>
           <dt><kbd>Shift</kbd></dt><dd data-k="ctlWalk"></dd>
           <dt><kbd>LMB</kbd></dt><dd data-k="ctlFire"></dd>
           <dt><kbd>RMB</kbd></dt><dd data-k="ctlAlt"></dd>
@@ -140,6 +141,7 @@
         <label class="row"><span data-k="fov"></span><input type="range" id="fovIn" min="60" max="95" step="1"><output id="fovInOut"></output></label>
         <label class="row"><span data-k="vol"></span><input type="range" id="vol" min="0" max="1" step="0.05"><output id="volOut"></output></label>
         <div class="toggles"><label class="tg"><input type="checkbox" id="fsToggle"><i></i><span data-k="fullscreen"></span></label></div>
+        <label class="row panic-row"><span data-k="panicUrl"></span><input type="url" id="panicUrl" class="url" spellcheck="false" autocomplete="off"></label>
       </section>
 
       <section class="pane" data-pane="xhair" hidden>
@@ -203,6 +205,6 @@
   </div>
 
   <noscript><p class="nojs">YEK Strike needs JavaScript and WebGL.</p></noscript>
-  <script type="module" src="assets/fun/main.js?v=6"></script>
+  <script type="module" src="assets/fun/main.js?v=7"></script>
 </body>
 </html>

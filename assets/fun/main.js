@@ -50,7 +50,8 @@ const STR = {
     autoBuy: 'Ölünce aynı silahları tekrar al', statDmg: 'Hasar', statRate: 'Atış hızı', statMob: 'Hareket', buyHint: 'B ile kapat',
     rounds: 'Raunt', dm: 'DM', nextRound: 'Bir sonraki rauntta doğacaksın', tWin: 'TERÖRİSTLER KAZANDI', ctWin: 'ANTİ-TERÖRİSTLER KAZANDI',
     matchOver: 'MAÇ BİTTİ', roundN: 'RAUNT {n}', winMoney: '+${m} raunt ödülü', fullscreen: 'Tam ekran (Ctrl ile eğilme)',
-    ctrlHint: 'Ctrl ile eğilmek için tam ekran gerekir (Ayarlar). Şimdilik C kullan.', freeze: 'Hazırlan…',
+    ctrlHint: 'Ctrl ile eğilmek için tam ekran gerekir (Ayarlar). Tam ekran değilken X ile eğil.', freeze: 'Hazırlan…',
+    ctlPanic: 'Panik: sekme başka siteye gider', panicUrl: 'Panik sitesi (C)',
     lobbies: 'LOBİLER', lobbiesOpen: '{n} açık lobi', createLobby: '+ Yeni lobi oluştur', join: 'KATIL', full: 'DOLU', yours: 'SENİN',
     noLobbies: 'Şu an açık lobi yok. Yeni bir lobi oluştur ya da OYNA\'ya bas, arkadaşın LOBİLER\'den seni görsün.',
     hostBy: 'host: {n}', bots_n: '+{n} bot', invite: 'Davet linkini kopyala', copied: 'Davet linki kopyalandı, arkadaşına gönder.',
@@ -79,7 +80,8 @@ const STR = {
     autoBuy: 'Re-buy the same loadout on respawn', statDmg: 'Damage', statRate: 'Fire rate', statMob: 'Mobility', buyHint: 'B to close',
     rounds: 'Rounds', dm: 'DM', nextRound: 'You will spawn next round', tWin: 'TERRORISTS WIN', ctWin: 'COUNTER-TERRORISTS WIN',
     matchOver: 'MATCH OVER', roundN: 'ROUND {n}', winMoney: '+${m} round reward', fullscreen: 'Fullscreen (Ctrl to crouch)',
-    ctrlHint: 'Crouching with Ctrl needs fullscreen (Settings). Use C for now.', freeze: 'Get ready…',
+    ctrlHint: 'Crouching with Ctrl needs fullscreen (Settings). Outside fullscreen, crouch with X.', freeze: 'Get ready…',
+    ctlPanic: 'Panic: the tab jumps to another site', panicUrl: 'Panic site (C)',
     lobbies: 'LOBBIES', lobbiesOpen: '{n} open lobbies', createLobby: '+ Create a new lobby', join: 'JOIN', full: 'FULL', yours: 'YOURS',
     noLobbies: 'No open lobbies right now. Create one or hit PLAY, and your friend will see you under LOBBIES.',
     hostBy: 'host: {n}', bots_n: '+{n} bots', invite: 'Copy invite link', copied: 'Invite link copied, send it to your friend.',
@@ -102,7 +104,7 @@ function applyLang() {
 // ---------------------------------------------------------------- settings
 const XHAIR_DEFAULTS = { color: '#4dff6a', size: 6, gap: 2, thick: 2, alpha: 1, dot: false, outline: true, dynamic: false, tstyle: false };
 const saved = (() => { try { return JSON.parse(store.get('yek-strike') || '{}'); } catch (e) { return {}; } })();
-const settings = Object.assign({ name: '', sens: 2, fov: 74, vol: 0.6, team: 'auto', bots: true, map: 'awp_lego', autoBuy: true, rounds: 10, fullscreen: true }, saved);
+const settings = Object.assign({ name: '', sens: 2, fov: 74, vol: 0.6, team: 'auto', bots: true, map: 'awp_lego', autoBuy: true, rounds: 10, fullscreen: true, panicUrl: 'https://www.google.com' }, saved);
 if (saved.v !== 3) { settings.sens = 2; settings.v = 3; settings.gfx = {}; }
 settings.gfx = { ...GFX_DEFAULTS, ...(settings.gfx || {}) };
 settings.xhair = { ...XHAIR_DEFAULTS, ...(saved.xhair || {}) };
@@ -711,7 +713,7 @@ function playerInput() {
   if (l > 0) { wx /= l; wz /= l; }
   e.wish = [wx, wz];
   e.walk = active && (keys.has('ShiftLeft') || keys.has('ShiftRight'));
-  e.crouchKey = active && (keys.has('KeyC') || (G.kbLock && (keys.has('ControlLeft') || keys.has('ControlRight'))));
+  e.crouchKey = active && (keys.has('KeyX') || (G.kbLock && (keys.has('ControlLeft') || keys.has('ControlRight'))));
   e.jumpKey = active && keys.has('Space');
 }
 
@@ -1056,7 +1058,7 @@ function showPause(on, tab) {
   if (on && tab) openTab(tab);
   if (window.VersionSwitcher) window.VersionSwitcher.hide(G.mode === 'game' && !on);
 }
-const LOCK_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyR', 'KeyT', 'KeyN', 'KeyF', 'KeyB', 'KeyC', 'KeyM', 'KeyY', 'Tab', 'Space',
+const LOCK_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyR', 'KeyT', 'KeyN', 'KeyF', 'KeyB', 'KeyC', 'KeyX', 'KeyM', 'KeyY', 'Tab', 'Space',
   'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'Digit1', 'Digit2', 'Digit3', 'Digit4'];
 async function lock() {
   sfx.unlock();
@@ -1227,7 +1229,22 @@ document.addEventListener('keyup', e => {
   if (e.code === 'Tab') { G.board = false; hud.board(false); }
 });
 addEventListener('blur', () => { keys.clear(); G.mouseDown = false; });
-addEventListener('beforeunload', e => { if (G.mode === 'game' && G.locked) { e.preventDefault(); e.returnValue = ''; } });
+addEventListener('beforeunload', e => { if (G.mode === 'game' && G.locked && !G.panic) { e.preventDefault(); e.returnValue = ''; } });
+function panic() {
+  G.panic = true;
+  try { if (sfx.ctx) sfx.ctx.suspend(); } catch (e) { /* no audio yet */ }
+  let url = String(settings.panicUrl || '').trim();
+  if (!/^https?:\/\//i.test(url)) url = 'https://www.google.com';
+  location.replace(url);
+}
+// capture phase, before any other handler: C anywhere except while typing
+document.addEventListener('keydown', e => {
+  if (e.code !== 'KeyC' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  const el = document.activeElement;
+  if (G.typing || (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && el.type !== 'range' && el.type !== 'checkbox')) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  panic();
+}, true);
 
 // ---------------------------------------------------------------- lobby UI
 let lobby = null;
@@ -1313,6 +1330,8 @@ bindRange('#sens', settings, 'sens', v => (+v).toFixed(2), saveSettings);
 bindRange('#fovIn', settings, 'fov', v => v + '°', saveSettings);
 bindRange('#vol', settings, 'vol', v => Math.round(v * 100) + '%', () => { sfx.setVolume(settings.vol); saveSettings(); });
 bindToggle('#fsToggle', settings, 'fullscreen', saveSettings);
+$('#panicUrl').value = settings.panicUrl;
+$('#panicUrl').addEventListener('change', e => { settings.panicUrl = e.target.value.trim() || 'https://www.google.com'; e.target.value = settings.panicUrl; saveSettings(); });
 
 // crosshair
 const XCOLORS = ['#4dff6a', '#4cf2ff', '#ffe14d', '#ffffff', '#ff5fd2', '#ff3b30'];

@@ -376,3 +376,4 @@ html.playing #game { cursor: none; }
 @media (max-width: 600px) { .lbs-row { grid-template-columns: 1fr auto; } .lbs-row .srv-art, .lbs-count { display: none; } }
 .credits { margin: 12px 0 0; font: 500 11px var(--mono); color: var(--dim); text-align: center; }
 .credits a { color: var(--dim); }
+.panic-row .url { grid-column: 2 / 4; width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px; background: rgba(0, 0, 0, .35); font: 500 12px var(--mono); color: var(--ink); }
