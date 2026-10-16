@@ -730,6 +730,11 @@ function interpolate(x, renderT) {
   D.yaw = a.yaw + dy * k;
   D.pitch = a.pitch + (b.pitch - a.pitch) * k;
   D.alive = b.alive; D.crouch = b.crouch; D.scope = b.scope; D.prot = b.prot; D.onGround = b.onGround; D.w = b.w;
+  // velocity from the two snapshots around the render time (not frame-to-frame deltas, which jitter)
+  const span = Math.max(30, b.t - a.t);
+  const tvx = a === b ? 0 : (b.p[0] - a.p[0]) / span * 1000, tvz = a === b ? 0 : (b.p[2] - a.p[2]) / span * 1000;
+  const vel = D.vel || (D.vel = [0, 0]);
+  vel[0] += (tvx - vel[0]) * 0.25; vel[1] += (tvz - vel[1]) * 0.25;
   x.alive = b.alive; x.hp = b.hp; x.w = b.w; x.armor = b.armor;
   D.speedRaw = Math.hypot(D.p[0] - px, D.p[2] - pz);
 }
@@ -895,7 +900,8 @@ function gameFrame(dt) {
     const onGround = mine ? x.body.onGround : x.disp.onGround;
     const alive = mine ? x.alive : x.disp.alive;
     x.avatar.setWeapon(mine ? x.w : x.disp.w);
-    x.avatar.update(dt, { p, yaw: mine ? x.yaw : x.disp.yaw, pitch: mine ? x.pitch : x.disp.pitch, crouch: mine ? x.body.h < BODY.h : x.disp.crouch, alive, speed: Math.min(speed, 7), onGround, showTag: x.team === me.team || G.aimEnt === x, protected: isProt(x) });
+    const vel = mine ? [x.body.v[0], x.body.v[2]] : (x.disp.vel || [0, 0]);
+    x.avatar.update(dt, { p, yaw: mine ? x.yaw : x.disp.yaw, pitch: mine ? x.pitch : x.disp.pitch, crouch: mine ? x.body.h < BODY.h : x.disp.crouch, alive, speed: Math.min(speed, 7), vel, onGround, showTag: x.team === me.team || G.aimEnt === x, protected: isProt(x) });
     if (alive && onGround && speed > 3.4) {
       x.stepT -= dt;
       if (x.stepT <= 0) { x.stepT = 0.36; sfx.step(p, 0.4); }

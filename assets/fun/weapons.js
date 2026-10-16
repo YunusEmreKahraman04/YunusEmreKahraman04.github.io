@@ -446,6 +446,11 @@ export class ViewModel {
     this.shellI = 0;
     this.scene.add(this.shells);
 
+    // a spare magazine that the support hand brings in during reloads
+    this.magProp = new THREE.Mesh(rb(0.03, 0.15, 0.06, 0.008), gunMaterials().dark);
+    this.magProp.visible = false;
+    this.root.add(this.magProp);
+
     this.current = null;
     this.t = 0; this.kick = 0; this.draw = 0; this.swayX = 0; this.swayY = 0; this.flashT = 0; this.swing = 0; this.swingSide = 1;
     this.bolt = -1; this.boltEjected = false; this.slideT = 0; this.inspectT = -1; this.land = 0; this.crouchK = 0;
@@ -543,7 +548,8 @@ export class ViewModel {
 
     if (reloading) {
       const tilt = seg(rel, 0, 0.15) * (1 - seg(rel, 0.85, 1));
-      rz += tilt * 0.55; rx += tilt * 0.18; py -= tilt * 0.02; px -= tilt * 0.01;
+      // tilt the gun a little and lift it so the magazine well is in view
+      rz += tilt * 0.32; rx += tilt * 0.12; ry -= tilt * 0.08; py += tilt * 0.012; px -= tilt * 0.018;
     }
     // bolt / pump cycle after a shot
     if (this.bolt >= 0) {
@@ -582,16 +588,30 @@ export class ViewModel {
     if (G.slide) G.slide.position.z = this.slideT * 0.04;
 
     this.placeArm(this.armR, G.gun, this._h.set(0, -0.035, 0), ELBOW_R);
-    if (this.armL.g.visible) {
+    // reload: the support hand pulls the mag down out of view and brings a fresh one up into the well
+    const pistol = W.cat === 'pistol';
+    const well = pistol ? this._g.set(0, -0.15, 0.03) : this._g.set(0, -0.1, -0.2);
+    const withMag = reloading && W.cat !== 'shotgun' && W.cat !== 'knife';
+    let k = 0;
+    if (withMag) {
+      k = seg(rel, 0.08, 0.18) * (1 - seg(rel, 0.7, 0.82));
+      const down = seg(rel, 0.18, 0.32) * (1 - seg(rel, 0.45, 0.66));
+      well.y -= down * 0.3; well.z += down * 0.05;
+      this.magProp.scale.set(1, pistol ? 0.7 : (W.cat === 'heavy' ? 0.8 : 1), pistol ? 0.8 : 1);
+      this.magProp.position.copy(well).applyMatrix4(G.gun.matrix);
+      this.magProp.rotation.set(pistol ? -0.22 : 0.12, 0, 0);
+      this.magProp.visible = rel > 0.14 && rel < 0.7;
+      // seating the new mag gives the gun a little upward slap
+      r.position.y += seg(rel, 0.62, 0.68) * (1 - seg(rel, 0.68, 0.78)) * 0.012;
+    } else this.magProp.visible = false;
+    if (this.armL.g.visible || (withMag && pistol)) {
       const hl = this._l;
       if (G.hand) {
         hl.set(...G.hand);
         if (G.pump) hl.z += G.pump.position.z;
-        if (reloading && G.mag) {
-          const k = seg(rel, 0.1, 0.18) * (1 - seg(rel, 0.68, 0.8));
-          hl.lerp(this._g.set(0, -0.12, -0.25).add(G.mag.position), k);
-        }
       } else hl.set(-0.025, -0.08, 0);
+      if (withMag) hl.lerp(this._h.copy(well).add(this._v.set(0, -0.06, 0)), k);
+      this.armL.g.visible = true;
       this.placeArm(this.armL, G.gun, hl, ELBOW_L);
     }
 
