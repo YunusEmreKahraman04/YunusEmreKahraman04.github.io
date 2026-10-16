@@ -47,6 +47,10 @@ const DEF = {
   // ------------------------------------------------ heavy
   m249: { name: 'M249', cat: 'heavy', team: 'both', price: 5200, reward: 300, dmg: 32, pen: 0.8, range: 0.97, rate: 0.08, auto: true, mag: 100, reserve: 200, reload: 5.7, spread: 0.006, move: 0.08, air: 0.2, heat: 0.0018, rec: 0.8, speed: 195, sound: 'lmg' },
   negev: { name: 'Negev', cat: 'heavy', team: 'both', price: 1700, reward: 300, dmg: 35, pen: 0.71, range: 0.97, rate: 0.075, auto: true, mag: 150, reserve: 300, reload: 5.7, spread: 0.008, move: 0.08, air: 0.2, heat: 0.0012, rec: 0.6, speed: 150, sound: 'lmg' },
+  // ------------------------------------------------ grenades (thrown, see nades.js)
+  flash: { name: 'Flashbang', cat: 'grenade', team: 'both', price: 200, reward: 300, dmg: 0, pen: 1, rate: 0.9, mag: 2, reserve: 0, reload: 0, spread: 0, move: 0, air: 0, heat: 0, speed: 245, sound: 'knife' },
+  he: { name: 'HE Grenade', cat: 'grenade', team: 'both', price: 300, reward: 300, dmg: 98, pen: 0.57, rate: 0.9, mag: 1, reserve: 0, reload: 0, spread: 0, move: 0, air: 0, heat: 0, speed: 245, sound: 'knife' },
+  smoke: { name: 'Smoke Grenade', cat: 'grenade', team: 'both', price: 300, reward: 300, dmg: 0, pen: 1, rate: 0.9, mag: 1, reserve: 0, reload: 0, spread: 0, move: 0, air: 0, heat: 0, speed: 245, sound: 'knife' },
   // ------------------------------------------------ knife
   knife: { name: 'Knife', cat: 'knife', team: 'both', price: 0, reward: 1500, dmg: 40, altDmg: 65, rate: 0.42, altRate: 1.0, melee: 1.9, auto: true, mag: Infinity, reserve: 0, reload: 0, spread: 0, move: 0, air: 0, heat: 0, speed: 250, sound: 'knife' }
 };
@@ -55,7 +59,7 @@ export const WEAPONS = {};
 for (const [id, d] of Object.entries(DEF)) {
   WEAPONS[id] = {
     ...d, id,
-    slot: d.cat === 'knife' ? 3 : d.cat === 'pistol' ? 2 : 1,
+    slot: d.cat === 'knife' ? 3 : d.cat === 'pistol' ? 2 : d.cat === 'grenade' ? 4 : 1,
     speed: d.speed * U, scopedSpeed: (d.scopedSpeed || d.speed) * U,
     moveSpread: d.move, airSpread: d.air, crouchMul: d.cat === 'sniper' ? 0.8 : 0.72,
     pattern: d.auto ? pat(d.rec ?? 1, d.recY ?? d.rec ?? 1) : [[(d.kick || 0) * deg, 0]],
@@ -329,9 +333,26 @@ function knife(m) {
 }
 
 // Gun points down -z with the grip at the origin. userData holds refs for animation.
+function grenadeModel(id, m) {
+  const g = new THREE.Group();
+  const body = id === 'he' ? m.olive : id === 'smoke' ? m.grey : m.steel;
+  if (id === 'he') add(g, sphere(0.032), body, 0, 0.02, -0.04);
+  else add(g, cy(0.026, 0.026, 0.095, 14), body, 0, 0.02, -0.04, Math.PI / 2);
+  add(g, cy(0.012, 0.012, 0.025, 10), m.dark, 0, 0.07, -0.04, Math.PI / 2);
+  add(g, rb(0.012, 0.07, 0.006, 0.002), m.metal, 0.018, 0.04, -0.03, 0, 0, -0.15);
+  const ring = new THREE.Mesh(GEO.ring ||= new THREE.TorusGeometry(0.014, 0.003, 6, 14), m.steel);
+  ring.position.set(-0.018, 0.085, -0.04); g.add(ring);
+  return { g, mag: new THREE.Group(), muzzle: new THREE.Object3D(), port: new THREE.Object3D(), hand: null };
+}
 export function gunModel(id) {
   if (PACK[id]) return packModel(id);
   const m = gunMaterials();
+  if (WEAPONS[id] && WEAPONS[id].cat === 'grenade') {
+    const r = grenadeModel(id, m);
+    r.g.add(r.mag, r.muzzle, r.port);
+    r.g.userData = { muzzle: r.muzzle, port: r.port, mag: r.mag, bolt: null, slide: null, pump: null, hand: null };
+    return r.g;
+  }
   const r = id === 'knife' ? knife(m) : PISTOL[id] ? pistol(PISTOL[id], m) : longGun(SPEC[id] || SPEC.ak47, m);
   r.g.add(r.mag, r.muzzle, r.port);
   r.g.traverse(o => { if (o.isMesh) o.castShadow = true; });
@@ -403,7 +424,7 @@ function flashTexture() {
 // where each kind of gun sits in front of the camera (x right, y up, z forward is negative), at view scale 0.5
 const OFFSET = {
   pistol: [0.11, -0.115, -0.27], smg: [0.12, -0.13, -0.28], rifle: [0.13, -0.135, -0.3], sniper: [0.125, -0.13, -0.29],
-  shotgun: [0.13, -0.135, -0.3], heavy: [0.14, -0.15, -0.31], knife: [0.13, -0.125, -0.26]
+  shotgun: [0.13, -0.135, -0.3], heavy: [0.14, -0.15, -0.31], knife: [0.13, -0.125, -0.26], grenade: [0.12, -0.12, -0.24]
 };
 const ELBOW_R = new THREE.Vector3(0.34, -0.5, 0.5);
 const ELBOW_L = new THREE.Vector3(-0.72, -0.5, 0.32);
@@ -493,6 +514,7 @@ export class ViewModel {
     this.inspectT = -1;
     if (melee) { this.swing = 1; this.swingSide = -this.swingSide; return; }
     const W = WEAPONS[this.current];
+    if (W.cat === 'grenade') { this.swing = 1; this.swingSide = 1; return; }
     this.kick = W.cat === 'shotgun' || W.cat === 'sniper' ? 1.4 : 1;
     this.flashT = SILENT.has(this.current) ? 0 : 0.045;
     this.flash.rotation.z = Math.random() * Math.PI;

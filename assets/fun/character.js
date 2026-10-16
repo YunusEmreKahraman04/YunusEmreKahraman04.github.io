@@ -101,7 +101,8 @@ export class SkinAvatar {
   setWeapon(id) {
     if (this.weapon === id || !WEAPONS[id]) return;
     this.weapon = id;
-    const node = id === 'deagle' ? 'Revolver' : NODE_FOR[WEAPONS[id].cat] || 'AK';
+    const cat = WEAPONS[id].cat;
+    const node = id === 'deagle' ? 'Revolver' : cat === 'grenade' ? null : NODE_FOR[cat] || 'AK';
     for (const [n, g] of Object.entries(this.guns)) g.visible = n === node;
     this.gunNode = this.guns[node] || null;
   }

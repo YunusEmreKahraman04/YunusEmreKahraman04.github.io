@@ -12,7 +12,8 @@ export class Hud {
       death: $('#death'), deathBy: $('#deathBy'), deathT: $('#deathT'), dmg: $('#dmgDir'), msg: $('#centerMsg'),
       radar: $('#radar'), peers: $('#peerCount'), prot: $('#protect'), reload: $('#reloadBar'), slots: $('#slots'),
       fps: $('#fps'), kill: $('#killBanner'), money: $('#moneyVal'), armor: $('#armorVal'),
-      round: $('#roundInfo'), banner: $('#roundBanner'), hurt: $('#hurtFx')
+      round: $('#roundInfo'), banner: $('#roundBanner'), hurt: $('#hurtFx'),
+      flash: $('#flashFx'), use: $('#useBar'), hint: $('#hint')
     };
     this.radarCtx = this.el.radar.getContext('2d');
     this.msgTimer = 0;
@@ -42,6 +43,20 @@ export class Hud {
     this._xkey = key;
     drawCrosshair(c, cfg, gap);
   }
+  // white-out from a flashbang: amount 0..1
+  flashed(amount) {
+    const ms = 600 + 3800 * amount;
+    this.el.flash.getAnimations().forEach(a => a.cancel());
+    this.el.flash.animate([{ opacity: Math.min(1, 0.35 + amount) }, { opacity: Math.min(1, 0.35 + amount), offset: 0.35 }, { opacity: 0 }], { duration: ms, easing: 'ease-in' });
+  }
+  useBar(p, label) {
+    const show = p >= 0;
+    if (show !== this._useShow) { this._useShow = show; this.el.use.hidden = !show; }
+    if (!show) return;
+    this.el.use.firstElementChild.style.transform = 'scaleX(' + Math.min(1, p) + ')';
+    if (label !== this._useLabel) { this._useLabel = label; this.el.use.lastElementChild.textContent = label; }
+  }
+  hint(text) { if (text !== this._hint) { this._hint = text; this.el.hint.textContent = text; this.el.hint.hidden = !text; } }
   fps(text) { this.el.fps.textContent = text; }
   killBanner(name, hs, streak) {
     const b = this.el.kill;
@@ -99,7 +114,7 @@ export class Hud {
   }
   slots(list, active) {
     // list: [{key, name, id}]
-    const key = active + list.map(s => s.id).join();
+    const key = active + list.map(s => s.id + s.name).join();
     if (key === this._slotKey) return;
     this._slotKey = key;
     const html = list.map(s => `<li class="${s.id === active ? 'on' : ''}"><b>${s.key}</b>${esc(s.name)}</li>`).join('');
@@ -190,6 +205,15 @@ export class Hud {
       g.fillStyle = tall ? 'rgba(150,158,170,.95)' : 'rgba(95,104,116,.95)';
       g.fillRect((b.min[0] - x0 + 2) * S, (b.min[2] - z0 + 2) * S, (b.max[0] - b.min[0]) * S, (b.max[2] - b.min[2]) * S);
     }
+    if (def.bombsites) {
+      g.font = '900 ' + (S * 6) + 'px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      for (const [k, r] of Object.entries(def.bombsites)) {
+        g.fillStyle = 'rgba(255,90,60,.22)';
+        g.fillRect((r[0] - x0 + 2) * S, (r[1] - z0 + 2) * S, (r[2] - r[0]) * S, (r[3] - r[1]) * S);
+        g.fillStyle = 'rgba(255,120,90,.9)';
+        g.fillText(k, ((r[0] + r[2]) / 2 - x0 + 2) * S, ((r[1] + r[3]) / 2 - z0 + 2) * S);
+      }
+    }
     this.radarImg = { c, S, ox: x0 - 2, oz: z0 - 2 };
   }
   radar(me, yaw, blips) {
@@ -208,6 +232,7 @@ export class Hud {
     for (const b of blips) {
       const x = (b.p[0] - me[0]) * scale, y = (b.p[2] - me[2]) * scale;
       g.fillStyle = b.color;
+      if (b.bomb) { g.fillRect(x - 4, y - 3, 8, 6); continue; }
       g.beginPath(); g.arc(x, y, b.dead ? 2.5 : 4, 0, Math.PI * 2); g.fill();
       if (b.dead) continue;
       g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 1; g.stroke();

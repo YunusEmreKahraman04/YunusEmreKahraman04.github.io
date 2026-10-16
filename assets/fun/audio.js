@@ -131,5 +131,28 @@ export class Sfx {
   }
   scope() { if (!this.ctx) return; const d = this.out(null, 0.35); this.burst(d, { bp: 3000, q: 6, decay: 0.04, vol: 1 }); }
   death(pos) { if (!this.ctx) return; const d = this.out(pos, 0.7); this.tone(d, { f0: 220, f1: 70, decay: 0.35, vol: 0.8, type: 'sawtooth' }); this.burst(d, { lp: 600, decay: 0.2, vol: 0.6, delay: 0.25 }); }
+  explosion(pos, k = 1) {
+    if (!this.ctx) return;
+    const d = this.out(pos, 1.6 * k);
+    this.tone(d, { f0: 90, f1: 28, decay: 0.9 * k + 0.3, vol: 1.2 });
+    this.burst(d, { lp: 1800, decay: 0.5 * k + 0.2, vol: 1.2 });
+    this.burst(d, { lp: 500, decay: 1.4 * k, vol: 0.6, delay: 0.05, attack: 0.04 });
+  }
+  flashbang(pos) {
+    if (!this.ctx) return;
+    const d = this.out(pos, 1.2);
+    this.burst(d, { hp: 1200, lp: 9000, decay: 0.12, vol: 1 });
+    this.tone(d, { f0: 180, f1: 60, decay: 0.2, vol: 0.8 });
+  }
+  ring(sec) {
+    // tinnitus after being flashed
+    if (!this.ctx) return;
+    this.tone(this.out(null, 0.18), { f0: 3100, f1: 2900, decay: sec, vol: 1 });
+  }
+  bounce(pos) { if (!this.ctx) return; this.tone(this.out(pos, 0.35), { f0: 900 + Math.random() * 400, f1: 500, decay: 0.05, vol: 1, type: 'triangle' }); }
+  smoke(pos) { if (!this.ctx) return; const d = this.out(pos, 0.8); this.burst(d, { bp: 900, q: 0.6, decay: 2.2, vol: 0.6, attack: 0.2 }); }
+  beep(pos, last) { if (!this.ctx) return; this.tone(this.out(pos, last ? 1.2 : 0.7), { f0: last ? 1500 : 2200, decay: last ? 0.4 : 0.09, vol: 1, type: 'square' }); }
+  tick() { if (!this.ctx) return; this.tone(this.out(null, 0.2), { f0: 1300, decay: 0.03, vol: 1, type: 'square' }); }
+  pin() { if (!this.ctx) return; const d = this.out(null, 0.5); this.burst(d, { bp: 4000, q: 4, decay: 0.05, vol: 1 }); this.tone(d, { f0: 2600, f1: 1800, decay: 0.08, vol: 0.4, type: 'triangle', delay: 0.05 }); }
   ui() { if (!this.ctx) return; this.tone(this.out(null, 0.25), { f0: 880, f1: 1320, decay: 0.06, vol: 1, type: 'triangle' }); }
 }

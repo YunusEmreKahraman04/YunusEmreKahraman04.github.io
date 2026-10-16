@@ -327,6 +327,9 @@ html.playing #game { cursor: none; }
 .art-aim_redline { background: linear-gradient(#2b2724 0 22%, #e2ded5 22% 70%, #6f6c66 70%); }
 .art-aim_redline::before { content: ''; position: absolute; left: 36px; top: 30px; width: 24px; height: 30px; background: #9b2c24; box-shadow: 0 -12px 0 -4px #8a2620; }
 .art-aim_redline::after { content: ''; position: absolute; left: 10px; bottom: 6px; width: 16px; height: 14px; background: #a77a4a; box-shadow: 62px 2px 0 -2px #7d8a96, 12px -12px 0 -4px #a77a4a; }
+.art-de_dust2 { background: linear-gradient(#f2d7a6 0 26%, #d9bd8c 26% 68%, #b99a6c 68%); }
+.art-de_dust2::before { content: ''; position: absolute; left: 10px; bottom: 12px; width: 30px; height: 26px; background: #c8ab7c; box-shadow: 44px -8px 0 -2px #bfa070, 22px 4px 0 -8px #35679b; }
+.art-de_dust2::after { content: ''; position: absolute; left: 58px; bottom: 6px; width: 14px; height: 14px; background: #9b7a4c; box-shadow: 0 -12px 0 -2px #a8865a; }
 .art-awp_lego { background: radial-gradient(circle at 30% 30%, #e05a4c 0 3px, transparent 4px) 0 0 / 10px 10px, linear-gradient(#dfe6ec 0 30%, #c4281c 30%); }
 .art-awp_lego::before { content: ''; position: absolute; left: 8px; bottom: 10px; width: 40px; height: 22px; background: #f5cd2f; box-shadow: 46px -6px 0 -4px #1e6fd6, 14px -16px 0 -6px #f5cd2f; border-radius: 1px; }
 
@@ -339,6 +342,13 @@ html.playing #game { cursor: none; }
 .round-banner.tw b { color: var(--t); }
 .round-banner.ctw b { color: var(--ct); }
 .hurt-fx { position: absolute; inset: 0; opacity: 0; box-shadow: inset 0 0 140px rgba(200, 0, 0, .55); }
+.flash-fx { position: absolute; inset: 0; opacity: 0; background: #fff; pointer-events: none; z-index: 5; }
+.use-bar { position: absolute; left: 50%; top: 62%; width: 260px; transform: translateX(-50%); height: 26px; border-radius: 6px; background: rgba(0, 0, 0, .55); overflow: hidden; display: grid; place-items: center; }
+.use-bar[hidden] { display: none; }
+.use-bar i { position: absolute; inset: 0; background: linear-gradient(90deg, #d1a640, #ffd36a); transform-origin: left; transform: scaleX(0); }
+.use-bar span { position: relative; font: 700 12px var(--mono); letter-spacing: .12em; color: #111; }
+.use-hint { position: absolute; left: 50%; top: 66%; transform: translateX(-50%); margin: 0; padding: 6px 12px; border-radius: 6px; background: rgba(0, 0, 0, .45); font: 600 13px var(--mono); color: #ffe7a8; pointer-events: none; }
+.use-hint[hidden] { display: none; }
 .hitmark.on { animation: none; }
 .dmg.on { animation: none; }
 

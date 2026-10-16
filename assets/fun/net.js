@@ -96,7 +96,9 @@ export function joinMatch(roomId, handlers) {
     hit: make('ht', (d, id) => handlers.hit(d, id)),
     kill: make('kl', (d, id) => handlers.kill(d, id)),
     chat: make('ch', (d, id) => handlers.chat(d, id)),
-    round: make('rd', (d, id) => handlers.round(d, id))
+    round: make('rd', (d, id) => handlers.round(d, id)),
+    bomb: make('bm', (d, id) => handlers.bomb(d, id)),
+    nade: make('nd', (d, id) => handlers.nade(d, id))
   };
   room.onPeerJoin = id => handlers.join(id);
   room.onPeerLeave = id => handlers.leave(id);

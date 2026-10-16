@@ -84,6 +84,48 @@ const TEX = {
     g.fillStyle = 'rgba(20,18,15,.55)'; g.fillRect(0, 0, s, 2); g.fillRect(0, 0, 2, s); g.fillRect(0, s / 2, s, 2); g.fillRect(s / 2, 0, 2, s);
   }) },
   brick: { tile: 2, make: () => canvas(512, (g, s) => bricks(g, s, '#e7e3da', '#c9c3b6', 30, 9, 0.04)) },
+  // dust: sun-bleached plaster walls with a stone footing, sandy flagstones underfoot
+  sandwall: { tile: 4, make: () => canvas(512, (g, s) => {
+    g.fillStyle = '#d6bf94'; g.fillRect(0, 0, s, s);
+    for (let i = 0; i < 26; i++) {
+      const x = Math.random() * s, y = Math.random() * s * 0.8, r = 30 + Math.random() * 90;
+      const gr = g.createRadialGradient(x, y, 0, x, y, r);
+      gr.addColorStop(0, Math.random() < 0.5 ? 'rgba(255,240,210,.25)' : 'rgba(120,90,50,.16)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, s, s);
+    }
+    speckle(g, s, 9000, ['#7a6040', '#fff3d8'], 1.6, 0.22);
+    // exposed stone blocks where the plaster has fallen off
+    for (let i = 0; i < 7; i++) {
+      const bx = Math.random() * s, by = Math.random() * s * 0.7;
+      for (let j = 0; j < 5; j++) { g.fillStyle = shade('#b49a70', (Math.random() - 0.5) * 0.08); g.fillRect(bx + (j % 3) * 26, by + Math.floor(j / 3) * 14, 24, 12); }
+    }
+    // stone footing along the bottom metre
+    const f = s * 0.75;
+    g.fillStyle = '#a58e68'; g.fillRect(0, f, s, s - f);
+    for (let r = 0; r < 4; r++) for (let c = -1; c < 8; c++) { g.fillStyle = shade('#ad9670', (Math.random() - 0.5) * 0.1); g.fillRect(c * 70 + (r % 2) * 35 + 2, f + r * 32 + 2, 66, 28); }
+    g.fillStyle = 'rgba(60,40,20,.35)'; g.fillRect(0, f - 3, s, 4);
+  }) },
+  sandfloor: { tile: 4, make: () => canvas(512, (g, s) => {
+    g.fillStyle = '#b89e74'; g.fillRect(0, 0, s, s);
+    for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) {
+      g.fillStyle = shade('#c2a87c', (Math.random() - 0.5) * 0.1);
+      const w = s / 6;
+      g.fillRect(c * w + 3 + Math.random() * 4, r * w + 3 + Math.random() * 4, w - 8, w - 8);
+    }
+    speckle(g, s, 12000, ['#6b5230', '#fff0d0'], 1.5, 0.25);
+    for (let i = 0; i < 12; i++) {
+      const x = Math.random() * s, y = Math.random() * s, r = 40 + Math.random() * 80;
+      const gr = g.createRadialGradient(x, y, 0, x, y, r);
+      gr.addColorStop(0, 'rgba(225,200,150,.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, s, s);
+    }
+  }) },
+  door: { tile: 2, make: () => canvas(256, (g, s) => {
+    g.fillStyle = '#35679b'; g.fillRect(0, 0, s, s);
+    for (let x = 0; x < s; x += s / 8) { g.fillStyle = shade('#3a6ea3', (Math.random() - 0.5) * 0.08); g.fillRect(x + 1, 0, s / 8 - 3, s); }
+    speckle(g, s, 2500, ['#1d3550', '#9fc0e0'], 2, 0.3);
+    g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, s * 0.2, s, 6); g.fillRect(0, s * 0.75, s, 6);
+  }) },
   pillar: { tile: 2, make: () => canvas(256, (g, s) => bricks(g, s, '#8c3b26', '#55322a', 30, 9, 0.06)) },
   container: { tile: 1, make: () => canvas(128, (g, s) => {
     g.fillStyle = '#9b2c24'; g.fillRect(0, 0, s, s);
@@ -190,10 +232,27 @@ const MAT_DEF = {
   beam: env => new THREE.MeshStandardMaterial({ color: '#34373c', roughness: 0.5, metalness: 0.6, envMapIntensity: env }),
   lampshade: env => new THREE.MeshStandardMaterial({ color: '#2c2f33', roughness: 0.4, metalness: 0.7, envMapIntensity: env }),
   bulb: () => new THREE.MeshBasicMaterial({ color: new THREE.Color('#fff1d0').multiplyScalar(4) }),
-  dark: () => new THREE.MeshStandardMaterial({ color: '#111111', roughness: 0.6 })
+  dark: () => new THREE.MeshStandardMaterial({ color: '#111111', roughness: 0.6 }),
+  sandwall: env => new THREE.MeshStandardMaterial({ map: tex('sandwall'), roughness: 0.95, envMapIntensity: env }),
+  sandfloor: env => new THREE.MeshStandardMaterial({ map: tex('sandfloor'), roughness: 0.95, envMapIntensity: env }),
+  door: env => new THREE.MeshStandardMaterial({ map: tex('door'), roughness: 0.8, envMapIntensity: env }),
+  signA: () => signMaterial('A'),
+  signB: () => signMaterial('B')
 };
-const UV_TILE = { concrete: 4, dock: 4, brick: 2, pillar: 2, container: 1, hazard: 1 };
-const NO_SHADOW = new Set(['ceiling', 'bulb', 'beam', 'lampshade', 'dark', 'hazard']);
+// a big spray-painted bombsite letter
+function signMaterial(letter) {
+  const c = canvas(256, (g, s) => {
+    g.clearRect(0, 0, s, s);
+    g.fillStyle = 'rgba(20,16,12,.85)'; g.font = '900 200px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(letter, s / 2, s / 2 + 10);
+    g.globalCompositeOperation = 'destination-out';
+    speckle(g, s, 1500, ['#000'], 3, 0.6);
+  });
+  const t = toTex(c, false);
+  return new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
+}
+const UV_TILE = { concrete: 4, dock: 4, brick: 2, pillar: 2, container: 1, hazard: 1, sandwall: 4, sandfloor: 4, door: 2 };
+const NO_SHADOW = new Set(['ceiling', 'bulb', 'beam', 'lampshade', 'dark', 'hazard', 'signA', 'signB', 'sandfloor']);
 
 // soft darkening where boxes meet what they stand on (cheap ambient occlusion)
 function contactShadows(boxes) {
@@ -201,7 +260,7 @@ function contactShadows(boxes) {
   const R = 0.6;
   const push = (x, y, z, a) => { pos.push(x, y, z); col.push(0, 0, 0, a); };
   for (const b of boxes) {
-    if (b.decor || b.floor || b.mat === 'ceiling') continue;
+    if (b.decor || b.floor || b.mat === 'ceiling' || b.mat === 'sandfloor' || b.mat === 'sandwall') continue;
     const support = boxes.some(o => o !== b && !o.decor && Math.abs(o.max[1] - b.min[1]) < 0.01 && o.min[0] < b.max[0] && o.max[0] > b.min[0] && o.min[2] < b.max[2] && o.max[2] > b.min[2]);
     if (!support) continue;
     const y = b.min[1] + 0.012;
@@ -374,7 +433,7 @@ export function buildWorld(def, renderer) {
 // ---------------------------------------------------------------- nav grid for bots
 function buildNav(def, boxes, ground) {
   const [x0, z0, x1, z1] = def.bounds;
-  const S = 1.2;
+  const S = def.navStep || 1.2;
   let nodes = [];
   const index = new Map();
   const key = (i, j) => i * 10000 + j;

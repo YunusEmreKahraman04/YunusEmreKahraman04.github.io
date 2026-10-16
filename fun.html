@@ -17,7 +17,7 @@
     } }
   </script>
   <link rel="modulepreload" href="assets/vendor/three/build/three.module.min.js">
-  <link rel="stylesheet" href="assets/fun/fun.css?v=7">
+  <link rel="stylesheet" href="assets/fun/fun.css?v=8">
   <link rel="stylesheet" href="assets/switcher/switcher.css?v=2">
   <script src="assets/switcher/switcher.js?v=1" data-current="fun"></script>
 </head>
@@ -77,6 +77,8 @@
           <dt><kbd>RMB</kbd></dt><dd data-k="ctlAlt"></dd>
           <dt><kbd>R</kbd></dt><dd data-k="ctlReload"></dd>
           <dt><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></dt><dd data-k="ctlSwitch"></dd>
+          <dt><kbd>4</kbd></dt><dd data-k="ctlNade"></dd>
+          <dt><kbd>E</kbd></dt><dd data-k="ctlUse"></dd>
           <dt><kbd>Q</kbd></dt><dd data-k="ctlLast"></dd>
           <dt><kbd>Tab</kbd></dt><dd data-k="ctlBoard"></dd>
           <dt><kbd>Y</kbd></dt><dd data-k="ctlChat"></dd>
@@ -96,6 +98,9 @@
     <p class="round-info" id="roundInfo"></p>
     <div class="round-banner" id="roundBanner"></div>
     <div class="hurt-fx" id="hurtFx" aria-hidden="true"></div>
+    <div class="flash-fx" id="flashFx" aria-hidden="true"></div>
+    <div class="use-bar" id="useBar" hidden><i></i><span></span></div>
+    <p class="use-hint" id="hint" hidden></p>
     <div class="peers" data-state="alone"><i></i><b id="peerCount">1</b> <span data-k="peers"></span></div>
     <ol class="feed" id="feed" aria-live="polite"></ol>
 
@@ -205,6 +210,6 @@
   </div>
 
   <noscript><p class="nojs">YEK Strike needs JavaScript and WebGL.</p></noscript>
-  <script type="module" src="assets/fun/main.js?v=8"></script>
+  <script type="module" src="assets/fun/main.js?v=9"></script>
 </body>
 </html>

@@ -13,6 +13,7 @@ import { thirdPersonGun } from './weapons.js';
 import { Sfx } from './audio.js';
 import { Hud, drawCrosshair } from './hud.js';
 import { Effects } from './effects.js';
+import { Grenades, NADES } from './nades.js';
 import { BotBrain, BOT_NAMES } from './bots.js';
 import { joinLobby, joinMatch, selfId, makeRoomId, parseRoomId, relayCount } from './net.js';
 
@@ -52,6 +53,9 @@ const STR = {
     matchOver: 'MAÇ BİTTİ', roundN: 'RAUNT {n}', winMoney: '+${m} raunt ödülü', fullscreen: 'Tam ekran (Ctrl ile eğilme)',
     ctrlHint: 'Ctrl ile eğilmek için tam ekran gerekir (Ayarlar). Tam ekran değilken X ile eğil.', freeze: 'Hazırlan…',
     ctlPanic: 'Panik: sekme başka siteye gider', panicUrl: 'Panik sitesi (C)',
+    ctlUse: 'Bomba kur / imha et', ctlNade: 'El bombaları', kit: 'İmha kiti',
+    plantHint: 'Bombayı kurmak için E basılı tut', defuseHint: 'İmha etmek için E basılı tut', planting: 'BOMBA KURULUYOR', defusing: 'İMHA EDİLİYOR',
+    planted: 'BOMBA KURULDU', defused: 'BOMBA İMHA EDİLDİ', exploded: 'BOMBA PATLADI', youHaveBomb: 'Bomba sende: A ya da B bölgesine kur', pickedBomb: 'Bombayı aldın', bombDropped: 'Bomba düştü',
     lobbies: 'LOBİLER', lobbiesOpen: '{n} açık lobi', createLobby: '+ Yeni lobi oluştur', join: 'KATIL', full: 'DOLU', yours: 'SENİN',
     noLobbies: 'Şu an açık lobi yok. Yeni bir lobi oluştur ya da OYNA\'ya bas, arkadaşın LOBİLER\'den seni görsün.',
     hostBy: 'host: {n}', bots_n: '+{n} bot', invite: 'Davet linkini kopyala', copied: 'Davet linki kopyalandı, arkadaşına gönder.',
@@ -82,6 +86,9 @@ const STR = {
     matchOver: 'MATCH OVER', roundN: 'ROUND {n}', winMoney: '+${m} round reward', fullscreen: 'Fullscreen (Ctrl to crouch)',
     ctrlHint: 'Crouching with Ctrl needs fullscreen (Settings). Outside fullscreen, crouch with X.', freeze: 'Get ready…',
     ctlPanic: 'Panic: the tab jumps to another site', panicUrl: 'Panic site (C)',
+    ctlUse: 'Plant / defuse', ctlNade: 'Grenades', kit: 'Defuse kit',
+    plantHint: 'Hold E to plant the bomb', defuseHint: 'Hold E to defuse', planting: 'PLANTING', defusing: 'DEFUSING',
+    planted: 'THE BOMB HAS BEEN PLANTED', defused: 'THE BOMB HAS BEEN DEFUSED', exploded: 'THE BOMB EXPLODED', youHaveBomb: 'You have the bomb: plant it at A or B', pickedBomb: 'You picked up the bomb', bombDropped: 'The bomb has been dropped',
     lobbies: 'LOBBIES', lobbiesOpen: '{n} open lobbies', createLobby: '+ Create a new lobby', join: 'JOIN', full: 'FULL', yours: 'YOURS',
     noLobbies: 'No open lobbies right now. Create one or hit PLAY, and your friend will see you under LOBBIES.',
     hostBy: 'host: {n}', bots_n: '+{n} bots', invite: 'Copy invite link', copied: 'Invite link copied, send it to your friend.',
@@ -125,6 +132,7 @@ camera.rotation.order = 'YXZ';
 const sfx = new Sfx(); sfx.setVolume(settings.vol);
 const hud = new Hud(t);
 const fx = new Effects(scene);
+const nades = new Grenades(scene, fx, sfx);
 const gfx = new Gfx(renderer, scene, camera);
 gfx.apply(settings.gfx);
 // one shared light for muzzle flashes in the world (a fixed light count avoids shader recompiles)
@@ -163,7 +171,9 @@ const G = {
   infoDirty: true, lastInfo: 0, lastState: 0, lastHost: 0, lastSpot: 0, lastRadar: 0,
   locked: false, mouseDown: false, triggerUsed: false, typing: false, board: false, buyOpen: false,
   aimEnt: null, mdx: 0, mdy: 0, killer: null, killerW: '', deathCam: 0, landed: false, streak: 0, streakAt: 0,
-  eyeOff: 0, money: 4000, pref: {}, kbLock: false, ctrlHinted: false, room: '', announceTick: 0, invite: '', p2pWarned: false,
+  eyeOff: 0, money: 4000, pref: {}, kbLock: false, ctrlHinted: false, nadeSeq: 0, hostId: '', shake: 0, beepAt: 0,
+  // bomb, run by the host in round mode on maps with bombsites
+  B: { carrier: null, dropped: null, planted: null, site: '', explodeAt: 0, by: null, defused: false, exploded: false, goal: 'A', sentAt: 0 }, room: '', announceTick: 0, invite: '', p2pWarned: false,
   // rounds: decided by the room host and mirrored by everyone
   R: { on: false, max: 0, n: 0, phase: '', endsAt: 0, startedAt: 0, wins: { T: 0, CT: 0 }, streak: { T: 0, CT: 0 }, sentAt: 0 }
 };
@@ -217,7 +227,7 @@ function setTeam(e, team) {
 }
 
 function spawn(e, keep = false) {
-  const kept = keep && e.alive && e.ws ? { inv: { ...e.ws.inv }, armor: e.armor, helmet: e.helmet } : null;
+  const kept = keep && e.alive && e.ws ? { inv: { ...e.ws.inv }, armor: e.armor, helmet: e.helmet, nades: Object.fromEntries(Object.keys(NADES).filter(k => e.ws.ammo[k] && e.ws.ammo[k].mag > 0).map(k => [k, e.ws.ammo[k].mag])), kit: e.kit } : null;
   const list = world.spawns[e.team];
   let best = list[0], bs = -Infinity;
   for (const s of list) {
@@ -235,9 +245,11 @@ function spawn(e, keep = false) {
   e.yaw = best.yaw; e.pitch = 0; e.hp = 100; e.alive = true; e.scope = 0; e.armor = 0; e.helmet = false;
   e.protUntil = now() + 1800; e.respawnAt = 0; e.spawnAt = now();
   e.ws = freshWS(e);
+  e.kit = false; e.useT = 0; e.blindUntil = 0;
   if (kept) {
-    e.ws.inv = kept.inv; e.armor = kept.armor; e.helmet = kept.helmet;
+    e.ws.inv = kept.inv; e.armor = kept.armor; e.helmet = kept.helmet; e.kit = kept.kit;
     for (const s of [1, 2, 3]) giveAmmo(e.ws, e.ws.inv[s]);
+    for (const [k, n] of Object.entries(kept.nades)) e.ws.ammo[k] = { mag: n, res: 0 };
   } else if (e.bot) botLoadout(e);
   if (e.brain) e.brain.reset();
   if (e === G.me && settings.autoBuy && !kept) rebuy();
@@ -248,7 +260,8 @@ function botLoadout(e) {
   e.armor = 100; e.helmet = true;
   if (mapDef.lego) return;
   const pool = BUY_GROUPS.find(g => g.key === 'rifle').ids.filter(id => allowed(id, e.team));
-  const pick = Math.random() < 0.7 ? mapDef.loadout[e.team] : pool[(Math.random() * pool.length) | 0];
+  const main = mapDef.loadout[e.team] || (e.team === 'T' ? 'ak47' : 'm4a4');
+  const pick = Math.random() < 0.7 ? main : pool[(Math.random() * pool.length) | 0];
   e.ws.inv[1] = pick; giveAmmo(e.ws, pick);
 }
 
@@ -267,6 +280,24 @@ function buy(id, quiet = false) {
   const me = G.me;
   if (!me || !me.alive) return false;
   if (!canBuy()) { if (!quiet) hud.center(t('buyClosed')); return false; }
+  if (NADES[id]) {
+    const have = me.ws.ammo[id] ? me.ws.ammo[id].mag : 0;
+    if (have >= NADES[id].max) return false;
+    if (G.money < NADES[id].price) { if (!quiet) hud.center(t('noMoney')); return false; }
+    G.money -= NADES[id].price;
+    me.ws.ammo[id] = { mag: have + 1, res: 0 };
+    if (!quiet) { sfx.ui(); hud.center(t('bought').replace('{n}', NADES[id].name), 900); }
+    renderBuy();
+    return true;
+  }
+  if (id === 'kit') {
+    if (me.team !== 'CT' || me.kit) return false;
+    if (G.money < 400) { if (!quiet) hud.center(t('noMoney')); return false; }
+    G.money -= 400; me.kit = true;
+    if (!quiet) { sfx.ui(); hud.center(t('bought').replace('{n}', t('kit')), 900); }
+    renderBuy();
+    return true;
+  }
   if (id === 'kevlar' || id === 'helmet') {
     let price = ARMOR[id].price;
     if (id === 'helmet' && me.armor >= 100) price = 350;
@@ -357,6 +388,7 @@ function fire(e, alt = false) {
   e.protUntil = 0;
   e.lastShot = ws.lastShot = tnow;
   const eye = eyeOf(e);
+  if (W.cat === 'grenade') { throwNade(e, alt); return true; }
   if (W.melee) {
     ws.next = tnow + (alt ? W.altRate : W.rate) * 1000;
     const d = dirOf(e.yaw, e.pitch);
@@ -532,6 +564,17 @@ function onKill(m) {
 // ---------------------------------------------------------------- network handlers
 const handlers = {
   join(id) { sendInfo(id); if (G.host && G.R.on) sendRound(id); },
+  bomb(d, peer) {
+      if (!d) return;
+      if (d.a) { if (G.host) hostBombAction(d, peer); return; }
+      if (!G.host) applyBomb(d);
+    },
+    nade(d, peer) {
+      const x = G.ents.get(d.i);
+      if (!x || x.owner !== peer || !NADES[d.k] || !Array.isArray(d.p) || !Array.isArray(d.v)) return;
+      x.lastShot = now();
+      nades.throw({ id: d.s, by: d.i, kind: d.k, p: d.p, v: d.v }, nadePop);
+    },
   round(d, peer) {
     // only the room host runs the clock
     if (!G.R.on || G.host || !d || typeof d.n !== 'number') return;
@@ -633,12 +676,14 @@ const botApi = {
       const d = [p[0] - eye[0], p[1] + y - eye[1], p[2] - eye[2]];
       const len = Math.hypot(...d);
       d[0] /= len; d[1] /= len; d[2] /= len;
-      if (rayWorld(world.boxes, eye, d, len).t >= len - 0.05) return true;
+      if (rayWorld(world.boxes, eye, d, len).t >= len - 0.05 && !nades.blocks(eye, [p[0], p[1] + y, p[2]])) return true;
     }
     return false;
   },
   fire: e => fire(e, false),
-  reload
+  reload,
+  objective: e => objectiveFor(e),
+  blind: e => now() < (e.blindUntil || 0)
 };
 function hostCheck() {
   const peers = new Set(G.net.peers());
@@ -646,6 +691,7 @@ function hostCheck() {
   for (const [pid, inf] of G.peerInfo) if (peers.has(pid)) cands.push([inf.since, pid]);
   cands.sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : 1));
   G.host = cands[0][1] === selfId;
+  G.hostId = cands[0][1];
   const mine = [...G.ents.values()].filter(x => x.bot && owned(x));
   if (!G.host || !settings.bots) { if (mine.length) { mine.forEach(removeEnt); G.infoDirty = true; } return; }
   if (now() - G.joinedAt < 2500) return;
@@ -679,7 +725,7 @@ function simulate(e, dt) {
   let speed = alive ? maxSpeedOf(e) : 0;
   if (e.walk) speed *= 0.52;
   if (b.h < BODY.h && b.onGround) speed *= 0.34;
-  const ice = frozen();
+  const ice = frozen() || e.useT > 0;
   _inp.wish = alive && !ice ? e.wish : [0, 0];
   _inp.speed = speed;
   _inp.jump = alive && !ice && e.jumpKey;
@@ -715,6 +761,7 @@ function playerInput() {
   e.walk = active && (keys.has('ShiftLeft') || keys.has('ShiftRight'));
   e.crouchKey = active && (keys.has('KeyX') || (G.kbLock && (keys.has('ControlLeft') || keys.has('ControlRight'))));
   e.jumpKey = active && keys.has('Space');
+  e.useKey = active && keys.has('KeyE');
 }
 
 function interpolate(x, renderT) {
@@ -744,7 +791,7 @@ function interpolate(x, renderT) {
 function sendRound(target) {
   if (!G.net) return;
   const R = G.R;
-  G.net.send('round', { n: R.n, ph: R.phase, left: Math.max(0, Math.round(R.endsAt - now())), w: R.wins, max: R.max, win: R.lastWin || '' }, target);
+  G.net.send('round', { n: R.n, ph: R.phase, left: Math.max(0, Math.round(R.endsAt - now())), w: R.wins, max: R.max, win: R.lastWin || '', why: R.lastWhy || '' }, target);
   R.sentAt = now();
 }
 function setPhase(phase, ms, extra = {}) {
@@ -762,12 +809,16 @@ function roundTick(tn) {
   if (R.phase === 'live') {
     const alive = { T: 0, CT: 0 }, total = { T: 0, CT: 0 };
     for (const x of G.ents.values()) { total[x.team]++; if (x.alive) alive[x.team]++; }
-    let win = '';
-    if (total.T && total.CT && (!alive.T || !alive.CT)) win = !alive.T && !alive.CT ? 'CT' : !alive.T ? 'CT' : 'T';
-    else if (tn >= R.endsAt) win = alive.T > alive.CT ? 'T' : 'CT';
+    let win = '', why = 'elim';
+    const B = G.B, bombMode = !!mapDef.bombsites;
+    if (bombMode && B.exploded) { win = 'T'; why = 'bomb'; }
+    else if (bombMode && B.defused) { win = 'CT'; why = 'defuse'; }
+    else if (bombMode && B.planted) { if (total.CT && !alive.CT) win = 'T'; }
+    else if (total.T && total.CT && (!alive.T || !alive.CT)) win = !alive.T && !alive.CT ? 'CT' : !alive.T ? 'CT' : 'T';
+    else if (tn >= R.endsAt) { win = bombMode ? 'CT' : alive.T > alive.CT ? 'T' : 'CT'; why = 'time'; }
     if (win) {
       const w = { ...R.wins, [win]: R.wins[win] + 1 };
-      setPhase('end', END_TIME, { w, win });
+      setPhase('end', END_TIME, { w, win, why });
     }
   } else if (tn >= R.endsAt) {
     if (R.phase === 'freeze') setPhase('live', ROUND_TIME);
@@ -777,6 +828,7 @@ function roundTick(tn) {
       else setPhase('freeze', FREEZE, { n: R.n + 1 });
     } else if (R.phase === 'over') setPhase('freeze', FREEZE, { n: 1, w: { T: 0, CT: 0 } });
   }
+  if (mapDef.bombsites && R.phase && R.phase !== 'over') bombTick(tn);
   if (tn - R.sentAt > 2000) sendRound();
 }
 function applyRound(d) {
@@ -798,21 +850,24 @@ function applyRound(d) {
     }
     for (const x of G.ents.values()) if (owned(x)) spawn(x, true);
     hud.banner(t('roundN').replace('{n}', R.n), '', 'neutral');
+    resetBomb();
+    nades.clear();
   } else if (R.phase === 'live') {
     R.startedAt = now();
     // joined mid-round: wait for the next one
     if (prevPhase === '' && me && me.alive && prevN !== R.n) { me.alive = false; me.respawnAt = 0; }
   } else if (R.phase === 'end') {
     const win = d.win || 'CT';
-    R.lastWin = win;
+    R.lastWin = win; R.lastWhy = d.why || '';
     if (me) {
       const mine = me.team === win;
       const lose = me.team === 'T' ? 'T' : 'CT';
       let gain;
-      if (mine) { gain = 3250; R.streak[me.team] = 0; }
+      if (mine) { gain = d.why === 'bomb' || d.why === 'defuse' ? 3500 : 3250; R.streak[me.team] = 0; }
       else { gain = Math.min(3400, 1400 + 500 * R.streak[lose]); R.streak[lose] = Math.min(4, R.streak[lose] + 1); }
       G.money = Math.min(MAX_MONEY, G.money + gain);
-      hud.banner(t(win === 'T' ? 'tWin' : 'ctWin'), t('winMoney').replace('{m}', gain), win === 'T' ? 'tw' : 'ctw');
+      const how = d.why === 'bomb' ? t('exploded') + '  ·  ' : d.why === 'defuse' ? t('defused') + '  ·  ' : '';
+      hud.banner(t(win === 'T' ? 'tWin' : 'ctWin'), how + t('winMoney').replace('{m}', gain), win === 'T' ? 'tw' : 'ctw');
       sfx.ui();
     }
   } else if (R.phase === 'over') {
@@ -821,12 +876,195 @@ function applyRound(d) {
   }
 }
 
+// ---------------------------------------------------------------- grenades
+function throwNade(e, alt) {
+  const ws = e.ws, kind = e.w, a = ws.ammo[kind];
+  if (!a || a.mag <= 0) return;
+  ws.next = now() + WEAPONS[kind].rate * 1000;
+  a.mag--;
+  const d = dirOf(e.yaw, e.pitch + 0.08), eye = eyeOf(e);
+  const speed = alt ? 6.5 : 15;
+  const p = [eye[0] + d[0] * 0.4, eye[1] + d[1] * 0.4 - 0.1, eye[2] + d[2] * 0.4];
+  const v = [d[0] * speed + e.body.v[0] * 0.8, d[1] * speed + (alt ? 1.5 : 2.2), d[2] * speed + e.body.v[2] * 0.8];
+  const id = e.id + ':' + (++G.nadeSeq);
+  nades.throw({ id, by: e.id, kind, p, v }, nadePop);
+  G.net && G.net.send('nade', { i: e.id, k: kind, p: p.map(r3), v: v.map(r3), s: id });
+  if (e === G.me) { vm.fire(true); sfx.pin(); }
+  if (a.mag <= 0) {
+    // back to the gun you had before
+    setTimeout(() => { if (e.alive && e.w === kind) switchWeapon(e, e.ws.inv[1] || e.ws.inv[2] || 'knife', true); }, 350);
+  }
+}
+// each client works out what a grenade did to the players it owns
+function nadePop(n) {
+  const p = n.p, me = G.me;
+  if (me && Math.hypot(p[0] - me.body.p[0], p[2] - me.body.p[2]) < 14) G.shake = n.kind === 'he' ? 1 : 0.3;
+  for (const x of G.ents.values()) {
+    if (!owned(x) || !x.alive) continue;
+    const eye = eyeOf(x);
+    const to = [p[0] - eye[0], p[1] + 0.15 - eye[1], p[2] - eye[2]];
+    const dist = Math.hypot(...to);
+    const dir = to.map(v => v / (dist || 1));
+    const clear = rayWorld(world.boxes, eye, dir, dist).t >= dist - 0.1;
+    if (n.kind === 'flash' && clear && dist < 32) {
+      const f = dirOf(x.yaw, x.pitch);
+      const facing = f[0] * dir[0] + f[1] * dir[1] + f[2] * dir[2];
+      const amount = (facing > 0.55 ? 1 : facing > -0.1 ? 0.55 : 0.18) * Math.max(0, 1 - dist / 32);
+      if (amount > 0.08) {
+        x.blindUntil = now() + 600 + 3800 * amount;
+        if (x === me) { hud.flashed(amount); sfx.ring(1 + amount * 2.5); }
+      }
+    } else if (n.kind === 'he' && clear && dist < 9) {
+      const dmg = 98 * Math.pow(1 - dist / 9, 1.3);
+      if (dmg > 1) applyDamage(x, n.by, dmg, 'body', 'he');
+    }
+  }
+}
+
+// ---------------------------------------------------------------- bomb
+const PLANT_TIME = 3.2, BOMB_TIME = 40000;
+const inSite = p => {
+  if (!mapDef.bombsites) return '';
+  for (const [k, r] of Object.entries(mapDef.bombsites)) if (p[0] > r[0] && p[0] < r[2] && p[2] > r[1] && p[2] < r[3]) return k;
+  return '';
+};
+function resetBomb() {
+  Object.assign(G.B, { carrier: null, dropped: null, planted: null, site: '', explodeAt: 0, by: null, defused: false, exploded: false, goal: Math.random() < 0.5 ? 'A' : 'B', sentAt: 0 });
+  fx.bomb(null);
+}
+function bombMsg() {
+  const B = G.B;
+  return { c: B.carrier || '', d: B.dropped || 0, p: B.planted || 0, s: B.site, left: B.planted ? Math.max(0, Math.round(B.explodeAt - now())) : 0, by: B.by || '', f: B.defused ? 1 : 0, x: B.exploded ? 1 : 0, g: B.goal };
+}
+function sendBomb() { if (G.net) G.net.send('bomb', bombMsg()); G.B.sentAt = now(); }
+// clients mirror the host's bomb state
+function applyBomb(d) {
+  const B = G.B, me = G.me;
+  const was = { planted: !!B.planted, defused: B.defused, exploded: B.exploded, carrier: B.carrier, dropped: !!B.dropped };
+  B.carrier = d.c || null; B.dropped = Array.isArray(d.d) ? d.d : null; B.planted = Array.isArray(d.p) ? d.p : null;
+  B.site = d.s || ''; B.by = d.by || null; B.defused = !!d.f; B.exploded = !!d.x; B.goal = d.g || B.goal;
+  if (B.planted) B.explodeAt = now() + (+d.left || 0);
+  bombEvents(was);
+}
+// banners, sounds and blast damage when the state changes
+function bombEvents(was) {
+  const B = G.B, me = G.me;
+  if (B.planted && !was.planted) { hud.banner(t('planted'), B.site ? B.site : '', 'tw'); sfx.beep(B.planted, false); fx.bomb(B.planted); }
+  if (!B.planted && was.planted) fx.bomb(null);
+  if (B.defused && !was.defused) { fx.bomb(null); sfx.beep(B.planted, true); }
+  if (B.exploded && !was.exploded) {
+    const p = B.planted || [0, 0, 0];
+    fx.explosion(p, 2.6); sfx.explosion(p, 2); fx.bomb(null);
+    if (me) G.shake = 2.2;
+    for (const x of G.ents.values()) {
+      if (!owned(x) || !x.alive) continue;
+      const q = posOf(x), dist = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]);
+      const dmg = 500 * Math.pow(Math.max(0, 1 - dist / 24), 2);
+      if (dmg > 1) applyDamage(x, B.by || x.id, dmg, 'body', 'c4');
+    }
+  }
+  if (me && B.carrier === me.id && was.carrier !== me.id) hud.center(G.R.phase === 'freeze' ? t('youHaveBomb') : t('pickedBomb'), 2600);
+  if (B.dropped && !was.dropped && me && me.team === 'T') hud.center(t('bombDropped'), 1600);
+}
+// host: who holds it, pick-ups, the fuse
+function bombTick(tn) {
+  const B = G.B, was = { planted: !!B.planted, defused: B.defused, exploded: B.exploded, carrier: B.carrier, dropped: !!B.dropped };
+  let changed = false;
+  if (!B.carrier && !B.dropped && !B.planted && !B.exploded && G.R.phase !== 'end') {
+    const ts = [...G.ents.values()].filter(x => x.team === 'T' && x.alive);
+    if (ts.length) { const humans = ts.filter(x => !x.bot); B.carrier = (humans.length && Math.random() < 0.6 ? humans : ts)[(Math.random() * (humans.length && Math.random() < 0.6 ? humans.length : ts.length)) | 0]?.id || ts[0].id; changed = true; }
+  }
+  const c = B.carrier && G.ents.get(B.carrier);
+  if (B.carrier && (!c || !c.alive)) {
+    const p = c ? posOf(c) : null;
+    B.carrier = null;
+    if (p && p[1] > -20) B.dropped = [p[0], world.ground(p[0], p[2]), p[2]];
+    else { const sp = world.spawns.T[0].p; B.dropped = [sp[0], world.ground(sp[0], sp[2]), sp[2]]; }
+    changed = true;
+  }
+  if (B.dropped) {
+    for (const x of G.ents.values()) {
+      if (x.team !== 'T' || !x.alive) continue;
+      const q = posOf(x);
+      if (Math.hypot(q[0] - B.dropped[0], q[2] - B.dropped[2]) < 1.3) { B.carrier = x.id; B.dropped = null; changed = true; break; }
+    }
+  }
+  if (B.planted && !B.defused && !B.exploded && tn >= B.explodeAt) { B.exploded = true; changed = true; }
+  if (changed) { bombEvents(was); sendBomb(); }
+  else if (tn - B.sentAt > 2000) sendBomb();
+}
+// host: plant / defuse reports from other players
+function hostBombAction(d, peer) {
+  const B = G.B, x = G.ents.get(d.by);
+  if (!x || (x.owner !== peer && x.owner !== selfId)) return;
+  const was = { planted: !!B.planted, defused: B.defused, exploded: B.exploded, carrier: B.carrier, dropped: !!B.dropped };
+  if (d.a === 'plant' && B.carrier === d.by && !B.planted && G.R.phase === 'live' && Array.isArray(d.pos)) {
+    B.planted = d.pos; B.site = inSite(d.pos) || d.site || ''; B.carrier = null; B.by = d.by; B.explodeAt = now() + BOMB_TIME;
+  } else if (d.a === 'defuse' && B.planted && !B.defused && !B.exploded) {
+    B.defused = true;
+  } else return;
+  bombEvents(was);
+  sendBomb();
+}
+function reportBomb(a, e) {
+  const msg = { a, by: e.id, pos: e.body.p.map(r2), site: inSite(e.body.p) };
+  if (G.host) hostBombAction(msg, selfId);
+  else if (G.net) G.net.send('bomb', msg, G.hostId);
+  if (e === G.me) { G.money = Math.min(MAX_MONEY, G.money + 300); }
+}
+// holding E: plant in a site with the bomb, defuse next to a planted one
+function useTick(dt, tn) {
+  const B = G.B, me = G.me;
+  let myBar = -1, myLabel = '', hint = '';
+  for (const x of G.ents.values()) {
+    if (!owned(x)) continue;
+    let need = 0, act = '';
+    if (x.alive && G.R.on && G.R.phase === 'live' && mapDef.bombsites) {
+      if (B.carrier === x.id && !B.planted && x.body.onGround && inSite(x.body.p)) { need = PLANT_TIME; act = 'plant'; }
+      else if (x.team === 'CT' && B.planted && !B.defused && !B.exploded && Math.hypot(x.body.p[0] - B.planted[0], x.body.p[2] - B.planted[2]) < 1.6) { need = x.kit ? 5 : 10; act = 'defuse'; }
+    }
+    if (act && x.useKey) {
+      x.useT = (x.useT || 0) + dt;
+      if (x.useT >= need) { x.useT = 0; reportBomb(act, x); }
+    } else x.useT = 0;
+    if (x === me) {
+      if (act) hint = act === 'plant' ? t('plantHint') : t('defuseHint');
+      if (x.useT > 0) { myBar = x.useT / need; myLabel = act === 'plant' ? t('planting') : t('defusing'); if (Math.floor(x.useT * 4) !== Math.floor((x.useT - dt) * 4)) sfx.tick(); }
+    }
+  }
+  hud.useBar(myBar, myLabel);
+  hud.hint(myBar < 0 ? hint : '');
+}
+// LED blink + beeps that speed up as the fuse runs down
+function bombVisuals(tn) {
+  const B = G.B;
+  if (!B.planted || B.defused || B.exploded) return;
+  const left = Math.max(0, B.explodeAt - tn);
+  const gap = left < 2000 ? 120 : 150 + 850 * Math.min(1, left / BOMB_TIME);
+  if (tn >= G.beepAt) { G.beepAt = tn + gap; sfx.beep(B.planted, left < 1000); fx.blink(true); setTimeout(() => fx.blink(false), 80); }
+}
+// what bots should be doing about the bomb
+function objectiveFor(e) {
+  const B = G.B;
+  if (!G.R.on || !mapDef.bombsites || G.R.phase !== 'live') return null;
+  const site = r => [(r[0] + r[2]) / 2, 0, (r[1] + r[3]) / 2];
+  if (e.team === 'CT') {
+    if (B.planted && !B.defused) return { pos: B.planted, use: true, radius: 1.1 };
+    return { pos: site(mapDef.bombsites[e.id.charCodeAt(e.id.length - 1) % 2 ? 'A' : 'B']), use: false, radius: 6 };
+  }
+  if (B.carrier === e.id) return { pos: site(mapDef.bombsites[B.goal] || mapDef.bombsites.A), use: !!inSite(e.body.p), radius: inSite(e.body.p) ? 99 : 2 };
+  if (B.dropped) return { pos: B.dropped, use: false, radius: 0.6 };
+  if (B.planted) return { pos: B.planted, use: false, radius: 5 };
+  const c = B.carrier && G.ents.get(B.carrier);
+  return { pos: c ? posOf(c) : site(mapDef.bombsites[B.goal] || mapDef.bombsites.A), use: false, radius: 4 };
+}
+
 // compile shaders and bake shared geometry before the first fight, not during it
 function warmUp() {
   fx.prewarm();
-  const ids = new Set(['knife', 'glock', 'usps', mapDef.loadout.T, mapDef.loadout.CT]);
+  const ids = new Set(['knife', 'glock', 'usps', 'ak47', 'm4a4', 'flash', 'he', 'smoke', mapDef.loadout.T, mapDef.loadout.CT].filter(Boolean));
   for (const id of ids) thirdPersonGun(id, GUN_MAT);
-  const temp = ['T', 'CT'].map(tm => { const a = new Avatar(tm, ''); a.setWeapon(mapDef.loadout[tm]); a.root.position.set(0, -40, 0); scene.add(a.root); return a; });
+  const temp = ['T', 'CT'].map(tm => { const a = new Avatar(tm, ''); a.setWeapon(mapDef.loadout[tm] || teamPistol(tm)); a.root.position.set(0, -40, 0); scene.add(a.root); return a; });
   for (const id of ids) vm.holder(id);
   gfx.warm();
   temp.forEach(a => a.dispose(scene));
@@ -950,6 +1188,10 @@ function gameFrame(dt) {
   }
 
   fx.update(dt);
+  nades.update(dt, world.boxes);
+  bombVisuals(tn);
+  if (fx.lightAt) { muzzleLight.position.set(fx.lightAt.p[0], fx.lightAt.p[1] + 1, fx.lightAt.p[2]); muzzleLight.intensity = fx.lightAt.k; muzzleT = fx.lightAt.t; fx.lightAt = null; }
+  if (G.shake > 0) { G.shake = Math.max(0, G.shake - dt * 1.8); camera.rotation.x += (Math.random() - 0.5) * G.shake * 0.05; camera.rotation.y += (Math.random() - 0.5) * G.shake * 0.05; }
 
   // HUD
   const ws = me.ws, ammo = ws.ammo[me.w] || { mag: 0, res: 0 };
@@ -962,14 +1204,18 @@ function gameFrame(dt) {
   hud.crosshair(Math.max(0, spreadPx * 0.6 + (tn - ws.lastShot < 120 ? 4 : 0)), me.alive && !me.scope && !G.buyOpen);
   hud.scope(me.alive ? me.scope : 0);
   hud.protect(me.alive && tn < me.protUntil);
-  hud.slots([1, 2, 3].filter(s => ws.inv[s]).map(s => ({ key: s, name: WEAPONS[ws.inv[s]].name, id: ws.inv[s] })), me.w);
+  hud.slots([1, 2, 3].filter(s => ws.inv[s]).map(s => ({ key: s, name: WEAPONS[ws.inv[s]].name, id: ws.inv[s] }))
+    .concat(Object.keys(NADES).filter(k => ws.ammo[k] && ws.ammo[k].mag > 0).map(k => ({ key: 4, name: NADES[k].name + (ws.ammo[k].mag > 1 ? ' ×' + ws.ammo[k].mag : ''), id: k })))
+    .concat(G.B.carrier === me.id ? [{ key: 5, name: 'C4', id: 'c4' }] : []), me.w);
+  useTick(dt, tn);
   let sT = 0, sCT = 0;
   for (const x of G.ents.values()) { if (x.team === 'T') sT += x.k; else sCT += x.k; }
   if (G.R.on) {
     hud.score(G.R.wins.T, G.R.wins.CT);
     const left = Math.max(0, G.R.endsAt - tn) / 1000;
     const clock = Math.floor(left / 60) + ':' + String(Math.floor(left % 60)).padStart(2, '0');
-    hud.round(G.R.phase === 'freeze' ? t('freeze') + ' ' + Math.ceil(left) : (G.R.phase === 'live' ? clock : '') + '  ·  R' + G.R.n + '/' + G.R.max);
+    const bombLeft = G.B.planted && !G.B.defused && !G.B.exploded ? Math.max(0, (G.B.explodeAt - tn) / 1000) : -1;
+    hud.round(G.R.phase === 'freeze' ? t('freeze') + ' ' + Math.ceil(left) : (G.R.phase === 'live' ? (bombLeft >= 0 ? '💣 ' + bombLeft.toFixed(1) : clock) : '') + '  ·  R' + G.R.n + '/' + G.R.max);
   } else { hud.score(sT, sCT); hud.round(''); }
   if (!me.alive) hud.death(true, G.killer ? G.killer.name : '', G.killerW, G.R.on ? -1 : (me.respawnAt - tn) / 1000);
   if (G.board) hud.board(true, [...G.ents.values()].map(x => ({ name: x.name, team: x.team, k: x.k, d: x.d, bot: x.bot, me: x === me, alive: x.alive })), { T: sT, CT: sCT });
@@ -984,6 +1230,8 @@ function gameFrame(dt) {
       if (!friend && tn - x.spotted > 1200 && tn - (x.lastShot || 0) > 900) continue;
       blips.push({ p: posOf(x), color: friend ? (me.team === 'CT' ? '#7fb2ff' : '#ffcf6a') : '#ff4a3d', dead: !x.alive });
     }
+    const bp = G.B.planted || G.B.dropped || (me.team === 'T' && G.B.carrier && G.ents.get(G.B.carrier) ? posOf(G.ents.get(G.B.carrier)) : null);
+    if (bp && (me.team === 'T' || G.B.planted)) blips.push({ p: bp, color: G.B.planted ? '#ff3b30' : '#ffcf6a', bomb: true });
     hud.radar(me.body.p, me.yaw, blips);
   }
 
@@ -1013,6 +1261,8 @@ function startGame(roomId) {
   setWorld(mapId);
   hud.radarMap(mapDef, world.boxes);
   fx.clear();
+  nades.clear();
+  resetBomb();
   G.ents.forEach(x => x.avatar && x.avatar.dispose(scene));
   G.ents.clear();
   G.peerInfo.clear();
@@ -1114,7 +1364,9 @@ function renderBuy() {
       return item(id, W.name, W.price, stats, me.ws.inv[W.slot] === id);
     }).join('')}</section>`;
   }).join('');
-  const gear = `<section class="bcol"><h3>${esc(t('gGear'))}</h3>${item('kevlar', ARMOR.kevlar.name, ARMOR.kevlar.price, '', me.armor >= 100)}${item('helmet', ARMOR.helmet.name, me.armor >= 100 && !me.helmet ? 350 : ARMOR.helmet.price, '', me.helmet && me.armor >= 100)}
+  const nadeItems = Object.entries(NADES).map(([k, n]) => item(k, n.name + ' (' + (me.ws.ammo[k] ? me.ws.ammo[k].mag : 0) + '/' + n.max + ')', n.price, '', me.ws.ammo[k] && me.ws.ammo[k].mag >= n.max)).join('')
+    + (me.team === 'CT' ? item('kit', t('kit'), 400, '', me.kit) : '');
+  const gear = `<section class="bcol"><h3>${esc(t('gGear'))}</h3>${item('kevlar', ARMOR.kevlar.name, ARMOR.kevlar.price, '', me.armor >= 100)}${item('helmet', ARMOR.helmet.name, me.armor >= 100 && !me.helmet ? 350 : ARMOR.helmet.price, '', me.helmet && me.armor >= 100)}${nadeItems}
     <label class="tg bauto"><input type="checkbox" id="autoBuy"${settings.autoBuy ? ' checked' : ''}><i></i><span>${esc(t('autoBuy'))}</span></label>
     <p class="blegend"><span>${esc(t('statDmg'))}</span><span>${esc(t('statRate'))}</span><span>${esc(t('statMob'))}</span></p></section>`;
   $('#buyCols').innerHTML = cols + gear;
@@ -1213,6 +1465,11 @@ document.addEventListener('keydown', e => {
     case 'Digit1': switchWeapon(me, me.ws.inv[1]); break;
     case 'Digit2': switchWeapon(me, me.ws.inv[2]); break;
     case 'Digit3': switchWeapon(me, 'knife'); break;
+    case 'Digit4': {
+      const kinds = Object.keys(NADES).filter(k => me.ws.ammo[k] && me.ws.ammo[k].mag > 0);
+      if (kinds.length) switchWeapon(me, kinds[(kinds.indexOf(me.w) + 1) % kinds.length], true);
+      break;
+    }
     case 'KeyQ': switchWeapon(me, me.ws.inv[me.ws.prev] || me.ws.inv[2]); break;
     case 'KeyR': reload(me); break;
     case 'KeyF': if (vm) vm.inspect(); break;
@@ -1485,5 +1742,5 @@ renderServers();
 // build the other map while the visitor reads the lobby
 setTimeout(() => { for (const id of MAP_ORDER) worlds[id] ||= buildWorld(MAPS[id], renderer); }, 600);
 root.classList.add('ready');
-if (/[?&]debug\b/.test(location.search)) window.__yek = { G, settings, applyRound, startGame, fire, switchWeapon, buy, openBuy, gfx, scene, camera, renderer, reload, get vm() { return vm; } };
+if (/[?&]debug\b/.test(location.search)) window.__yek = { G, settings, applyRound, startGame, fire, switchWeapon, buy, openBuy, gfx, scene, camera, renderer, reload, nades, get vm() { return vm; } };
 gfx.measureRefresh().then(hz => { const el = $('#refreshHz'); if (el) el.textContent = t('refresh').replace('{hz}', hz); requestAnimationFrame(frame); });

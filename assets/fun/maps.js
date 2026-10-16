@@ -3,6 +3,8 @@
 // A box is [x0, y0, z0, x1, y1, z1, material, colour?, flags?]; flag 'decor' = no collision.
 // A ramp is { x0, x1, z0, z1, y0, y1, mat, color } rising from y0 at x0 to y1 at x1.
 
+import { DUST2 } from './dust2.js';
+
 const mirrorX = b => [-b[3], b[1], b[2], -b[0], b[4], b[5], b[6], b[7], b[8]];
 const recolor = (list, from, to) => list.map(b => (b[7] === from ? [...b.slice(0, 7), to, b[8]] : b));
 const mirrorRamp = r => ({ ...r, x0: -r.x0, x1: -r.x1 });
@@ -124,5 +126,5 @@ const redline = (() => {
   };
 })();
 
-export const MAPS = { awp_lego: lego, aim_redline: redline };
-export const MAP_ORDER = ['awp_lego', 'aim_redline'];
+export const MAPS = { de_dust2: DUST2, awp_lego: lego, aim_redline: redline };
+export const MAP_ORDER = ['de_dust2', 'awp_lego', 'aim_redline'];

@@ -87,6 +87,14 @@ export class Effects {
     this.splatGeo = new THREE.PlaneGeometry(1.1, 1.1);
     this.puffTex = dotTexture('rgba(255,255,255,.8)', 'rgba(255,255,255,0)', 0.2);
     this._o = new THREE.Object3D();
+    const fb = dotTexture('rgba(255,240,200,1)', 'rgba(255,120,20,0)', 0.15);
+    this.fireballs = Array.from({ length: 4 }, () => {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: fb, color: new THREE.Color('#ffb070').multiplyScalar(4), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
+      sprite.visible = false;
+      scene.add(sprite);
+      return { sprite, life: 0, max: 1, size: 1, white: false };
+    });
+    this.lightAt = null;
     this.decals = {};
     for (const [k, geo, mat, n] of [['hole', this.holeGeo, this.holeMat, 160], ['splat', this.splatGeo, this.splatMat, 24]]) {
       const mesh = new THREE.InstancedMesh(geo, mat, n);
@@ -169,6 +177,49 @@ export class Effects {
     }
     this.puff(p, kind === 'plastic' ? '#f1f1f1' : kind === 'wood' ? '#b08a62' : '#b9b0a2', 0.35, 3);
   }
+  // fireball + smoke + debris; scale 1 = grenade, 2.5 = the bomb
+  explosion(p, scale = 1) {
+    const fire = this.fireballs.find(f => !f.sprite.visible) || this.fireballs[0];
+    fire.sprite.position.set(p[0], p[1] + 0.4 * scale, p[2]);
+    fire.life = fire.max = 0.45 + 0.2 * scale; fire.size = 3.2 * scale;
+    fire.sprite.visible = true;
+    for (let i = 0; i < 6 * scale; i++) this.puff([p[0] + (Math.random() - 0.5) * scale, p[1] + 0.5 + Math.random() * scale, p[2] + (Math.random() - 0.5) * scale], '#3a3530', 1.4 * scale, 1, 0.75);
+    for (let i = 0; i < 18 * scale; i++) {
+      this.sparks.emit({ x: p[0], y: p[1] + 0.3, z: p[2], vx: (Math.random() - 0.5) * 16, vy: Math.random() * 10, vz: (Math.random() - 0.5) * 16, life: 0.3 + Math.random() * 0.4, rx: Math.random() * 20, ry: Math.random() * 20, s: 1.6, floor: -99 });
+    }
+    for (let i = 0; i < 8 * scale; i++) {
+      this.chips.emit({ x: p[0], y: p[1] + 0.2, z: p[2], vx: (Math.random() - 0.5) * 9, vy: 3 + Math.random() * 6, vz: (Math.random() - 0.5) * 9, life: 1.5, rx: 20, ry: 20, s: 1.2, floor: p[1] + 0.02, color: '#4a4036' });
+    }
+    this.lightAt = { p, t: 0.12 * scale, k: 30 * scale };
+  }
+  flashPop(p) {
+    const fire = this.fireballs.find(f => !f.sprite.visible) || this.fireballs[0];
+    fire.sprite.position.set(p[0], p[1], p[2]);
+    fire.life = fire.max = 0.18; fire.size = 2.2;
+    fire.sprite.material.color.set('#ffffff').multiplyScalar(6);
+    fire.sprite.visible = true; fire.white = true;
+    this.lightAt = { p, t: 0.08, k: 60 };
+  }
+  // C4 on the ground with a blinking LED
+  bomb(p) {
+    if (!this.c4) {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.09, 0.2), new THREE.MeshStandardMaterial({ color: '#3d4a2e', roughness: 0.7 }));
+      body.position.y = 0.045; body.castShadow = true;
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.02, 0.1), new THREE.MeshStandardMaterial({ color: '#202020', roughness: 0.4 }));
+      pad.position.set(-0.05, 0.1, 0);
+      const wires = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.025, 0.04), new THREE.MeshStandardMaterial({ color: '#8a1f16' }));
+      wires.position.set(0, 0.1, 0.07);
+      this.led = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ff2a1a').multiplyScalar(5) }));
+      this.led.position.set(0.1, 0.11, -0.04);
+      g.add(body, pad, wires, this.led);
+      this.c4 = g;
+      this.scene.add(g);
+    }
+    this.c4.visible = !!p;
+    if (p) this.c4.position.set(p[0], p[1], p[2]);
+  }
+  blink(on) { if (this.led) this.led.visible = on; }
   blood(p) {
     // a quick dark mist plus droplets that fall
     this.puff(p, '#5a0606', 0.22, 3, 0.5);
@@ -197,6 +248,7 @@ export class Effects {
     }
   }
   clear() {
+    this.bomb(null);
     for (const k in this.decals) { this.decals[k].mesh.count = 0; this.decals[k].i = 0; }
     for (const t of this.tracers) t.mesh.visible = false;
     for (const s of this.puffs) s.sprite.visible = false;
@@ -204,6 +256,15 @@ export class Effects {
     for (const p of this.chips.p) p.life = 0;
   }
   update(dt) {
+    for (const f of this.fireballs) {
+      if (!f.sprite.visible) continue;
+      f.life -= dt;
+      const k = 1 - f.life / f.max;
+      const sc = f.size * (0.4 + k * 0.9);
+      f.sprite.scale.set(sc, sc, 1);
+      f.sprite.material.opacity = Math.max(0, 1 - k * k);
+      if (f.life <= 0) { f.sprite.visible = false; if (f.white) { f.white = false; f.sprite.material.color.set('#ffb070').multiplyScalar(4); } }
+    }
     for (const t of this.tracers) {
       if (!t.mesh.visible) continue;
       t.at += dt * 380;

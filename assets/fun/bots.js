@@ -23,8 +23,17 @@ export class BotBrain {
 
   update(dt, now) {
     const e = this.e, g = this.g;
-    e.wish = [0, 0]; e.walk = false; e.crouchKey = false; e.jumpKey = false;
+    e.wish = [0, 0]; e.walk = false; e.crouchKey = false; e.jumpKey = false; e.useKey = false;
     if (!e.alive) return;
+    // flashed: stumble around blind
+    if (g.blind && g.blind(e)) {
+      this.target = null;
+      if (now >= this.strafeAt) { this.strafe = [-1, 1, 0][(Math.random() * 3) | 0]; this.strafeAt = now + rand(300, 700); }
+      const ry = e.yaw - Math.PI / 2;
+      e.wish = [-Math.sin(ry) * this.strafe * 0.5, -Math.cos(ry) * this.strafe * 0.5];
+      e.yaw += dt * this.strafe * 0.6;
+      return;
+    }
     const W = WEAPONS[e.w];
     const eye = g.eye(e);
 
@@ -90,7 +99,7 @@ export class BotBrain {
       const errPitch = Math.abs(e.pitch - Math.atan2(dy, dist));
       const tol = Math.atan2(sniper ? 0.22 : 0.32, dist) + 0.004;
       if (shootingNow && now >= this.pauseUntil && errYaw < tol * 1.6 && errPitch < tol * 2) {
-        const mag = e.ws.ammo[e.w].mag;
+        const mag = e.ws.ammo[e.w] ? e.ws.ammo[e.w].mag : 0;
         if (mag <= 0) g.reload(e);
         else if (g.fire(e)) {
           this.burst++;
@@ -102,10 +111,28 @@ export class BotBrain {
     }
 
     // --- no one in sight: reload, then roam or chase a sound
-    if (e.ws.ammo[e.w].mag < W.mag * 0.4 && e.ws.ammo[e.w].res > 0) g.reload(e);
+    if (e.ws.ammo[e.w] && e.ws.ammo[e.w].mag < W.mag * 0.4 && e.ws.ammo[e.w].res > 0) g.reload(e);
     e.scope = 0;
     const nav = g.nav;
     const me = e.body.p;
+    // bomb mode: carry it to a site and plant, defuse it, or pick it up
+    const obj = g.objective && g.objective(e);
+    if (obj && !(this.lastSeen && now - this.lastSeenAt < 4000)) {
+      const od = Math.hypot(obj.pos[0] - me[0], obj.pos[2] - me[2]);
+      if (od < obj.radius) {
+        this.path = [];
+        if (obj.use) { e.useKey = true; e.crouchKey = e.team === 'CT'; }
+        else e.yaw += dt * 0.5 * (this.skill > 0.6 ? 1 : -1);
+        return;
+      }
+      const want = nav.nearest(obj.pos);
+      if (!this.path.length || this.goal !== want) {
+        this.goal = want;
+        this.path = nav.path(nav.nearest(me), want);
+        // close enough for the graph: walk straight at it
+        if (!this.path.length && od < 3) { e.wish = [(obj.pos[0] - me[0]) / od, (obj.pos[2] - me[2]) / od]; return; }
+      }
+    }
     if (this.lastSeen && now - this.lastSeenAt < 4000 && !this.path.length) {
       this.path = nav.path(nav.nearest(me), nav.nearest(this.lastSeen));
       this.lastSeen = null;
